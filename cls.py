@@ -1,7 +1,6 @@
 import random
-import pygame
 import time
-import np
+import numpy as np
 import matplotlib.pyplot as plt
 # The Person class acts as the primary Agent for 
 #   our scenario.
@@ -46,6 +45,7 @@ class Map:
         self.num_clusters = k
         self.board = self.generate_array()
         self.cluster_props = self.assign_cluster_probabilities()
+        self.place_clusters()
 
     def generate_array(self): 
         # Initialize the board with None (empty spaces)
@@ -74,8 +74,7 @@ class Map:
                 # Check if the cluster can fit without touching others (minimum 1 space around it)
                 if self.is_region_free(x_start, y_start, region_size):
                     cluster_areas.append((x_start, y_start, region_size))
-                    prob_nurse = self.cluster_props[cluster_index]
-                    self.populate_cluster(x_start, y_start, region_size, prob_nurse)
+                    self.populate_cluster(x_start, y_start, region_size)
                     placed = True
         
         if len(cluster_areas) < self.num_clusters:
@@ -107,20 +106,23 @@ class Map:
     def get_random_person(self): 
         return random.choice([person for row in self.board for person in row if person is not None and not person.is_nurse()])
 
-    def generate_array(self): 
-        for i in range(self.size): 
-            for j in range(self.size):
-                if random.random() < self.prob_person:
-                    self.add_person(i,j,[0.2])
-                # pass
-                #     
+    # def generate_array(self): 
+    #     for i in range(self.size): 
+    #         for j in range(self.size):
+    #             if random.random() < self.prob_person:
+    #                 self.add_person(i,j,[0.2])
+    #             # pass
+    #             #     
     def get_element_at(self,i,j): 
-        if self.board[i][j] == 0: 
-            return "Empty"
+        if self.board[i][j] is None: 
+            # return "Empty"
+            return 0
         if self.board[i][j].is_nurse():
-            return "Nurse" 
+            # return "Nurse" 
+            return 2
         else: 
-            return "Person"
+            # return "Person"
+            return 1
         
     # def add_person(self,i,j,cluster_props):
     #     self.board[i][j] = Person(prob_nurse=self.prob_nurse)
@@ -172,18 +174,13 @@ class Simulation:
     #     time.sleep(10)
         # pygame.quit()
 
-    def display_map(self):
+    def view(self):
         """Visualize the grid using matplotlib."""
-        grid = np.zeros((self.size, self.size))
+        grid = np.zeros((self.board_size, self.board_size))
         
-        for i in range(self.size):
-            for j in range(self.size):
-                if self.board[i][j] is None:
-                    grid[i][j] = 0  # Empty space
-                elif self.board[i][j].is_nurse():
-                    grid[i][j] = 2  # Nurse
-                else:
-                    grid[i][j] = 1  # Normal person
+        for i in range(self.board_size):
+            for j in range(self.board_size):
+                grid[i][j] = self.map.get_element_at(i,j)
         
         plt.imshow(grid, cmap='viridis', interpolation='nearest')
         plt.colorbar(label='0 = Empty, 1 = Person, 2 = Nurse')

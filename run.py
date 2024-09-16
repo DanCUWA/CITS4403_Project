@@ -1,5 +1,4 @@
 from cls import *
-from map import *
 BOARDSIZE = 100
 NUM_CLUSTERS = 4
 PROB_NURSE = 0.02

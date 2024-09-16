@@ -9,6 +9,7 @@ class Map:
         self.num_clusters = num_clusters
         self.board = self.generate_array()
         self.cluster_props = self.assign_cluster_probabilities()
+        self.place_clusters()
 
     def generate_array(self): 
         # Initialize the board with None (empty spaces)
@@ -59,7 +60,7 @@ class Map:
         """Populate a region with people, ensuring separation from other clusters."""
         for i in range(x_start, x_start + region_size):
             for j in range(y_start, y_start + region_size):
-                if random.random() < 0.7:  # 70% chance to place a person in the region
+                if random.random() < self.prob_person:  # 70% chance to place a person in the region
                     self.add_person(i, j, prob_nurse)
 
     def add_person(self, i, j, prob_nurse):
