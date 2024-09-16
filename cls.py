@@ -106,13 +106,6 @@ class Map:
     def get_random_person(self): 
         return random.choice([person for row in self.board for person in row if person is not None and not person.is_nurse()])
 
-    # def generate_array(self): 
-    #     for i in range(self.size): 
-    #         for j in range(self.size):
-    #             if random.random() < self.prob_person:
-    #                 self.add_person(i,j,[0.2])
-    #             # pass
-    #             #     
     def get_element_at(self,i,j): 
         if self.board[i][j] is None: 
             # return "Empty"
@@ -124,9 +117,6 @@ class Map:
             # return "Person"
             return 1
         
-    # def add_person(self,i,j,cluster_props):
-    #     self.board[i][j] = Person(prob_nurse=self.prob_nurse)
-
     def get_map(self):
         return self.board
 
@@ -152,28 +142,6 @@ class Simulation:
     def step(self): 
         pass
     
-    # def view(self):
-    #     pygame.init()
-    #     screen_size = 750
-    #     size_offset = float(float(screen_size) / float(self.board_size)) * 1.1
-    #     print("Offset ", size_offset)
-    #     screen = pygame.display.set_mode([screen_size, screen_size])
-    #     screen.fill((255, 255, 255))
-    #     for i in range(self.board_size): 
-    #         for j in range(self.board_size):
-    #             x = i * size_offset
-    #             y = j * size_offset
-    #             el_type = self.map.get_element_at(i,j)
-    #             print("(",el_type,end=") , ")
-    #             if el_type == "Person": 
-    #                 pygame.draw.circle(screen, (0, 0, 255), (x,y), 3)
-    #             elif el_type == "Nurse":
-    #                 pygame.draw.circle(screen, (0, 255, 0), (x,y), 3)
-    #     # while True:
-    #     pygame.display.flip()
-    #     time.sleep(10)
-        # pygame.quit()
-
     def view(self):
         """Visualize the grid using matplotlib."""
         grid = np.zeros((self.board_size, self.board_size))
