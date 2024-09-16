@@ -17,23 +17,34 @@ class Person:
     def is_nurse(self): 
         return self.nurse
     
+    def get_health(self): 
+        return self.health
+    
     def get_diseases(self):
         if len(self.diseases) == 0: 
             return None
         return self.diseases
 
+    def is_sick(self):
+        return len(self.diseases) > 0
     # Adding a disease doesn't trigger its' effects immediately, but 
     #   will trigger at the start of each timestep.
     def add_disease(self,disease): 
         self.diseases.append(disease)
+    
+    def clear_diseases(self): 
+        self.diseases = list()
         
 # The Disease class acts as the secondary Agent for our scenario.
 class Disease:
     def __init__(self): 
-        self.infectivity = random.randint(0,0.5)
-        self.mortality = random.randint(0,0.5)
+        self.infectivity = random.random()
+        self.mortality = random.random()
     def infect_person(self,map): 
         map.get_random_person().add_disease(self)
+
+    def will_spread(self): 
+        return random.random() < self.infectivity
 
 
 ## The map acts as the environment for our scenario.
@@ -95,7 +106,7 @@ class Map:
         """Populate a region with people, ensuring separation from other clusters."""
         for i in range(x_start, x_start + region_size):
             for j in range(y_start, y_start + region_size):
-                if random.random() < self.prob_person:  # 70% chance to place a person in the region
+                if random.random() < self.prob_person:
                     self.add_person(i, j)
 
     def add_person(self, i, j):
@@ -113,12 +124,78 @@ class Map:
         if self.board[i][j].is_nurse():
             # return "Nurse" 
             return 2
+        elif self.board[i][j].is_sick(): 
+            return 3
         else: 
             # return "Person"
             return 1
+    
+    # Assumes caller is sick.
+    def infect_surrounding(self,i,j): 
+        cur_diseases = self.board[i][j].get_diseases()
+        num = 0
+        for neighbour in self.get_neighbours(i,j):
+            if neighbour is not None: 
+                for disease in cur_diseases: 
+                    if disease.will_spread():
+                        neighbour.add_disease(disease)
         
+    def get_neighbours(self,i,j):
+        neighbours =  list()
+        for i in range(i-1,i+2):
+            for j in range(j-1,j+2): 
+                neighbours.append(self.board[i][j])
+        return neighbours
+
+    def get_infected_surrounding(self,i,j):
+        count = 0
+        for neighbour in self.get_neighbours(i,j): 
+            if neighbour is not None and neighbour.is_sick():
+                count += 1
+        return count
+
+    def get_safest_surrounding(self,i,j):
+        # Can only have a maximum of 9 neighbours.
+        lowest = 10
+        lowest_vals = None
+        for i in range(i-1,i+2):
+            for j in range(j-1,j+2): 
+                # Only consider empty neighbours
+                if self.get_element_at(i,j) == 0:
+                    unsafe_count = self.get_infected_surrounding(i,j) 
+                    if unsafe_count < lowest: 
+                        lowest = unsafe_count
+                        lowest_vals = [i,j]
+        return lowest_vals
+
     def get_map(self):
         return self.board
+    
+    def move_to(self,old_i,old_j,new_i,new_j): 
+        element = self.board[old_i][old_j]
+        self.clear_square(old_i,old_j)
+        self.board[new_i][new_j] = element
+
+    def get_most_infected_neighbour(self,i,j): 
+        lowest_health = 10
+        lowest_diseases = 10
+        highest_priority = None
+        for neighbour in self.get_neighbours(i,j): 
+            if neighbour is None: 
+                continue
+            health = neighbour.get_health()
+            diseases = neighbour.get_diseases()
+            if diseases is None:
+                continue
+            diseases = len(diseases)
+            if health <= lowest_health and diseases > lowest_diseases: 
+                lowest_health = health
+                lowest_diseases = diseases
+                highest_priority = neighbour
+        return highest_priority
+
+    def clear_square(self,i,j):
+        self.board[i][j] = None
 
 class Simulation: 
 
@@ -140,7 +217,34 @@ class Simulation:
             disease.infect_person(self.map)
 
     def step(self): 
-        pass
+        for i in range(self.board_size): 
+            for j in range(self.board_size): 
+                match self.map.get_element_at(i,j): 
+                    case 0: 
+                        # Empty
+                        continue
+                    case 1:  
+                        # Just Person
+                        num_infected = self.map.get_infected_surrounding(i,j) 
+                        if num_infected == 0: 
+                            continue
+                        ## Move to the safest empty square 
+                        safest_square = self.map.get_safest_surrounding(i,j)
+                        if safest_square is not None: 
+                            print("Moving to",safest_square[0],safest_square[1])
+                            self.map.move_to(i,j,safest_square[0],safest_square[1])
+                        continue
+                    case 2: 
+                        # Nurse
+                        endangered_node = self.map.get_most_infected_neighbour(i,j)
+                        if endangered_node is not None: 
+                            endangered_node.clear_diseases()
+                        continue
+                    case 3: 
+                        # Person with diseases
+                        # print("Infected",i,j)
+                        self.map.infect_surrounding(i,j)
+                        continue
     
     def view(self):
         """Visualize the grid using matplotlib."""
