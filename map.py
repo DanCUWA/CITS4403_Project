@@ -3,39 +3,6 @@ import numpy as np
 import matplotlib.pyplot as plt
 from cls.py import *
 
-PROB_NURSE = 0.01
-NUM_CLUSTERS = 4
-
-class Person: 
-    def __init__(self, prob_nurse): 
-        self.nurse = False
-        self.immunity = 0
-        self.natural_resistance = random.random()
-        self.health = random.randint(4, 7)
-        self.diseases = list()
-        if random.random() < prob_nurse: 
-            self.nurse = True
-    
-    def is_nurse(self): 
-        return self.nurse
-    
-    def get_diseases(self):
-        if len(self.diseases) == 0: 
-            return None
-        return self.diseases
-
-    def add_disease(self, disease): 
-        self.diseases.append(disease)
-        
-    
-class Disease:
-    def __init__(self): 
-        self.infectivity = random.uniform(0, 0.5)
-        self.mortality = random.uniform(0, 0.5)
-
-    def infect_person(self, map_obj): 
-        map_obj.get_random_person().add_disease(self)
-
 class Map:
     def __init__(self, size, num_clusters): 
         self.size = size
@@ -121,16 +88,6 @@ class Map:
     def get_random_person(self): 
         return random.choice([person for row in self.board for person in row if person is not None])
 
-# Test the Map class and display the grid
-if __name__ == "__main__":
-    size = 100  # Grid size 100x100
-    num_clusters = 4  # You can adjust the number of clusters
-    map_obj = Map(size, num_clusters)
 
-    # Place clusters randomly with spacing constraints
-    map_obj.place_clusters()
-
-    # Display the generated map/grid
-    map_obj.display_map()
 
 
