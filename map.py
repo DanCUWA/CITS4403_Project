@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-import cls.py
+from cls.py import *
 
 PROB_NURSE = 0.01
 NUM_CLUSTERS = 4
