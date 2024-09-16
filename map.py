@@ -1,7 +1,7 @@
 import random
 import numpy as np
 import matplotlib.pyplot as plt
-from cls.py import *
+from cls import *
 
 class Map:
     def __init__(self, size, num_clusters): 
