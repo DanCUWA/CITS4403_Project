@@ -2,6 +2,7 @@ import random
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+from queue import Queue
 # The Person class acts as the primary Agent for 
 #   our scenario.
 class Person: 
@@ -144,7 +145,10 @@ class Map:
         neighbours =  list()
         for i in range(i-1,i+2):
             for j in range(j-1,j+2): 
-                neighbours.append(self.board[i][j])
+                try:
+                    neighbours.append(self.board[i][j])
+                except Exception as e: 
+                    print("Invalid",e)
         return neighbours
 
     def get_infected_surrounding(self,i,j):
@@ -154,18 +158,20 @@ class Map:
                 count += 1
         return count
 
-    def get_safest_surrounding(self,i,j):
+    def get_safest_surrounding(self,start_i,start_j):
         # Can only have a maximum of 9 neighbours.
         lowest = 10
         lowest_vals = None
-        for i in range(i-1,i+2):
-            for j in range(j-1,j+2): 
+        for i in range(start_i-1,start_i+2):
+            for j in range(start_j-1,start_j+2): 
                 # Only consider empty neighbours
                 if self.get_element_at(i,j) == 0:
                     unsafe_count = self.get_infected_surrounding(i,j) 
+                    print(unsafe_count,"sick around",i,j)
                     if unsafe_count < lowest: 
                         lowest = unsafe_count
                         lowest_vals = [i,j]
+        print("Safest square is", lowest_vals, "with ",lowest,"infected surrounding")
         return lowest_vals
 
     def get_map(self):
@@ -197,6 +203,44 @@ class Map:
     def clear_square(self,i,j):
         self.board[i][j] = None
 
+    def map_to_ints(self): 
+        grid = np.zeros((self.size, self.size))
+        for i in range(self.size): 
+            for j in range(self.size): 
+                grid[i][j] = self.get_element_at(i,j)
+        return grid
+    
+    def get_closest_nurse(self,i,j): 
+        arr = np.array(self.map_to_ints())
+        nurses = np.argwhere(arr == 2)
+        # print(nurses)
+        min_distance = np.inf
+        ret = None
+        for coords in nurses: 
+            x = coords[0]
+            y = coords[1]
+            dist = self.get_distance_bewteen(i,j,x,y) 
+            if dist < min_distance: 
+                min_distance = dist
+                ret = [x,y]
+            # print("distances",i,j,x,y,dist)
+        return ret
+
+    def get_distance_bewteen(self,i,j,i2,j2): 
+        return np.sqrt((i - i2)**2 + (j - j2)**2)
+
+    def get_best_move_from_to(self,srci,srcj,desti,destj): 
+        min_dist = np.inf
+        best_move = None
+        for i in range(srci-1,srci+2):
+            for j in range(srcj-1,srcj+2): 
+                # Can only move to empty square
+                if self.get_element_at(i,j) == 0: 
+                    if self.get_distance_bewteen(i,j,desti,destj) < min_dist: 
+                        best_move = [i,j]
+        return best_move
+
+                
 class Simulation: 
 
     def __init__(self,board_size=100,num_clusters=4,prob_nurse=0.2,prob_person=0.4): 
@@ -225,25 +269,31 @@ class Simulation:
                         continue
                     case 1:  
                         # Just Person
-                        num_infected = self.map.get_infected_surrounding(i,j) 
-                        if num_infected == 0: 
-                            continue
-                        ## Move to the safest empty square 
-                        safest_square = self.map.get_safest_surrounding(i,j)
-                        if safest_square is not None: 
-                            print("Moving to",safest_square[0],safest_square[1])
-                            self.map.move_to(i,j,safest_square[0],safest_square[1])
+                        # num_infected = self.map.get_infected_surrounding(i,j) 
+                        # if num_infected == 0: 
+                        #     continue
+                        # ## Move to the safest empty square 
+                        # safest_square = self.map.get_safest_surrounding(i,j)
+                        # if safest_square is not None: 
+                        #     print("Moving to",safest_square[0],safest_square[1])
+                        #     self.map.move_to(i,j,safest_square[0],safest_square[1])
                         continue
                     case 2: 
                         # Nurse
-                        endangered_node = self.map.get_most_infected_neighbour(i,j)
-                        if endangered_node is not None: 
-                            endangered_node.clear_diseases()
+                        # endangered_node = self.map.get_most_infected_neighbour(i,j)
+                        # if endangered_node is not None: 
+                        #     endangered_node.clear_diseases()
                         continue
                     case 3: 
                         # Person with diseases
-                        # print("Infected",i,j)
-                        self.map.infect_surrounding(i,j)
+                        # self.map.infect_surrounding(i,j)
+                        nurse_coords = self.map.get_closest_nurse(i,j)
+                        if nurse_coords is None: 
+                            # Could just do random move 
+                            continue
+                        best_move = self.map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
+                        print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
+                        self.map.move_to(i,j,best_move[0],best_move[1])
                         continue
     
     def view(self):
