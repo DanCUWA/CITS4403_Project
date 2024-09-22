@@ -3,6 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
+import copy
 # The Person class acts as the primary Agent for 
 # our scenario.
 class Person: 
@@ -67,6 +68,13 @@ class Map:
         # Assign different probabilities to different clusters
         return [random.uniform(0.1, 0.5) for _ in range(self.num_clusters)]
 
+    def is_nurse_adjacent(self,i,j): 
+        neighbours = self.get_neighbours(i,j)
+        for neighbour in neighbours:
+            if neighbour is not None and neighbour.is_nurse(): 
+                return True 
+        return False
+    
     def place_clusters(self):
         # Randomly place clusters on the grid while ensuring they don't overlap and are separated by at least 1 space
         cluster_areas = []
@@ -243,10 +251,13 @@ class Map:
                     continue
                 # Can only move to empty square
                 if self.get_element_at(i,j) == 0: 
+                    print(i,j,desti,destj,"distance ",self.get_distance_bewteen(i,j,desti,destj))
                     if self.get_distance_bewteen(i,j,desti,destj) < min_dist: 
                         best_move = [i,j]
         return best_move
 
+    def copy(self): 
+        return copy.deepcopy(self)
                 
 class Simulation: 
 
@@ -257,6 +268,7 @@ class Simulation:
         self.prob_person = prob_person
         self.map = Map(board_size,num_clusters,prob_nurse=prob_nurse,prob_person=prob_person)
         self.disease_choices = list()
+        self.iterations = 0
 
 
     def add_disease_option(self): 
@@ -268,8 +280,13 @@ class Simulation:
             disease.infect_person(self.map)
 
     def step(self): 
+        self.iterations += 1 
+        new_map = self.map.copy()
+        print(new_map)
         for i in range(self.board_size): 
             for j in range(self.board_size): 
+                if not self.map.check_in_bounds(i,j): 
+                    continue
                 match self.map.get_element_at(i,j): 
                     case 0: 
                         # Empty
@@ -295,14 +312,17 @@ class Simulation:
                         # Person with diseases
                         # self.map.infect_surrounding(i,j)
                         print("Moving infected at",i,j)
-                        nurse_coords = self.map.get_closest_nurse(i,j)
+                        if new_map.is_nurse_adjacent(i,j):
+                            continue
+                        nurse_coords = new_map.get_closest_nurse(i,j)
                         if nurse_coords is None: 
                             # Could just do random move 
                             continue
-                        best_move = self.map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
+                        best_move = new_map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
                         print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
-                        self.map.move_to(i,j,best_move[0],best_move[1])
+                        new_map.move_to(i,j,best_move[0],best_move[1])
                         continue
+        self.map = new_map
     
     def view(self):
         """Visualize the grid using matplotlib."""
