@@ -117,6 +117,9 @@ class Map:
 
     def get_random_person(self): 
         return random.choice([person for row in self.board for person in row if person is not None and not person.is_nurse()])
+    
+    def check_in_bounds(self,i,j): 
+        return i >= 0 and i < self.size and j >= 0 and j < self.size 
 
     def get_element_at(self,i,j): 
         if self.board[i][j] is None: 
@@ -145,10 +148,8 @@ class Map:
         neighbours =  list()
         for i in range(i-1,i+2):
             for j in range(j-1,j+2): 
-                try:
+                if self.check_in_bounds(i,j):
                     neighbours.append(self.board[i][j])
-                except Exception as e: 
-                    print("Invalid",e)
         return neighbours
 
     def get_infected_surrounding(self,i,j):
@@ -164,6 +165,8 @@ class Map:
         lowest_vals = None
         for i in range(start_i-1,start_i+2):
             for j in range(start_j-1,start_j+2): 
+                if not self.check_in_bounds(i,j):
+                    continue
                 # Only consider empty neighbours
                 if self.get_element_at(i,j) == 0:
                     unsafe_count = self.get_infected_surrounding(i,j) 
@@ -207,6 +210,8 @@ class Map:
         grid = np.zeros((self.size, self.size))
         for i in range(self.size): 
             for j in range(self.size): 
+                if not self.check_in_bounds(i,j):
+                    continue
                 grid[i][j] = self.get_element_at(i,j)
         return grid
     
@@ -234,6 +239,8 @@ class Map:
         best_move = None
         for i in range(srci-1,srci+2):
             for j in range(srcj-1,srcj+2): 
+                if not self.check_in_bounds(i,j):
+                    continue
                 # Can only move to empty square
                 if self.get_element_at(i,j) == 0: 
                     if self.get_distance_bewteen(i,j,desti,destj) < min_dist: 
@@ -287,6 +294,7 @@ class Simulation:
                     case 3: 
                         # Person with diseases
                         # self.map.infect_surrounding(i,j)
+                        print("Moving infected at",i,j)
                         nurse_coords = self.map.get_closest_nurse(i,j)
                         if nurse_coords is None: 
                             # Could just do random move 
