@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 from queue import Queue
 # The Person class acts as the primary Agent for 
-#   our scenario.
+# our scenario.
 class Person: 
     def __init__(self,prob_nurse): 
         self.nurse = False

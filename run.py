@@ -1,7 +1,7 @@
 from cls import *
 import time
-BOARDSIZE = 25
-NUM_CLUSTERS = 1
+BOARDSIZE = 100
+NUM_CLUSTERS = 5
 PROB_NURSE = 0.02
 PROB_PERSON = 0.2
 def main():

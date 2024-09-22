@@ -29,6 +29,12 @@
 - iterate through each cluster and change each element to be covered by a person given p_i probability of assignment in the ith cluster - giving X_i total people in neighbourhood i with 
 - 
 
+## Usage
 
+Create a python virtual environment using `python3 -m venv venv`
+Install the required dependencies with `pip install -r requirements.txt`
+<!-- OSCAR START HERE -->
+Ensure you are in the correct directory (CITS4403_Project)
+Start the virtual environment with `source venv/bin/activate`
 
 
