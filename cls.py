@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 from queue import Queue
 import copy
 from enum import Enum
+import uuid
 class Tile(Enum): 
     EMPTY = 0
     PERSON = 1
@@ -29,8 +30,8 @@ class Person:
         return self.health
     
     def get_diseases(self):
-        if len(self.diseases) == 0: 
-            return None
+        # if len(self.diseases) == 0: 
+        #     return None
         return self.diseases
 
     def is_sick(self):
@@ -38,20 +39,29 @@ class Person:
     # Adding a disease doesn't trigger its' effects immediately, but 
     #   will trigger at the start of each timestep.
     def add_disease(self,disease): 
+        if self.has_disease(disease.name): 
+            print(self.diseases)
+            return
         self.diseases.append(disease)
+
     
     def clear_diseases(self): 
         # print(self.diseases)
         self.diseases = list()
         # print(self.diseases)
-        
+    def has_disease(self,name): 
+        for disease in self.diseases: 
+            if name == disease.name: 
+                return True 
+        return False
 # The Disease class acts as the secondary Agent for our scenario.
 class Disease:
     def __init__(self): 
         self.infectivity = random.random()
         self.mortality = random.random()
-    def infect_person(self,map): 
-        map.get_random_person().add_disease(self)
+        self.name = uuid.uuid4()
+    def infect_person(self,map):
+        map.get_random_person().add_disease(copy.deepcopy(self))
 
     def will_spread(self): 
         return random.random() < self.infectivity
@@ -152,13 +162,17 @@ class Map:
     
     # Assumes caller is sick.
     def infect_surrounding(self,i,j): 
+        if not self.board[i][j].is_sick(): 
+            return 
         cur_diseases = self.board[i][j].get_diseases()
         num = 0
         for neighbour, ni, nj in self.get_neighbours(i,j):
             if neighbour is not None: 
+                print("Adding from",cur_diseases,self.board[i][j].get_diseases())
                 for disease in cur_diseases: 
                     if disease.will_spread():
                         self.board[ni][nj].add_disease(disease)
+                        print(disease, "added to", ni,nj)
         
     def get_neighbours(self,srci,srcj):
         neighbours = list()
@@ -310,19 +324,16 @@ class Simulation:
             if not self.map.check_in_bounds(i,j): 
                 continue
             match self.map.get_element_at(i,j): 
-                case Tile.EMPTY: 
-                    # Empty
-                    continue
                 case Tile.PERSON:  
                     # Just Person
-                    # num_infected = self.map.get_infected_surrounding(i,j) 
-                    # if num_infected == 0: 
-                    #     continue
-                    # ## Move to the safest empty square 
-                    # safest_square = self.map.get_safest_surrounding(i,j)
-                    # if safest_square is not None: 
-                    #     print("Moving to",safest_square[0],safest_square[1])
-                    #     self.map.move_to(i,j,safest_square[0],safest_square[1])
+                    num_infected = new_map.get_infected_surrounding(i,j) 
+                    if num_infected == 0: 
+                        continue
+                    ## Move to the safest empty square 
+                    safest_square = new_map.get_safest_surrounding(i,j)
+                    if safest_square is not None: 
+                        print("Moving to",safest_square[0],safest_square[1])
+                        new_map.move_to(i,j,safest_square[0],safest_square[1])
                     continue
                 case Tile.NURSE: 
                     # Nurse
@@ -333,7 +344,7 @@ class Simulation:
                     continue
                 case Tile.INFECTED: 
                     # Person with diseases
-                    # self.map.infect_surrounding(i,j)
+                    new_map.infect_surrounding(i,j)
                     # print("Moving infected at",i,j)
                     if self.map.is_nurse_adjacent(i,j):
                         # print("Nurse adjacent to",i,j)
@@ -346,6 +357,7 @@ class Simulation:
                     # print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
                     new_map.move_to(i,j,best_move[0],best_move[1])
                     continue
+
         self.map = new_map
     
     def view(self):
