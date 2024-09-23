@@ -1,8 +1,13 @@
 from cls import *
 import time
 BOARDSIZE = 100
+<<<<<<< Updated upstream
 NUM_CLUSTERS = 5
 PROB_NURSE = 0.02
+=======
+NUM_CLUSTERS = 6
+PROB_NURSE = 0.05
+>>>>>>> Stashed changes
 PROB_PERSON = 0.2
 def main():
     sim = Simulation(board_size=BOARDSIZE,num_clusters=NUM_CLUSTERS,

@@ -3,7 +3,7 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 # The Person class acts as the primary Agent for 
-#   our scenario.
+# our scenario.
 class Person: 
     def __init__(self,prob_nurse): 
         self.nurse = False
