@@ -283,45 +283,52 @@ class Simulation:
         self.iterations += 1 
         new_map = self.map.copy()
         print(new_map)
+        spot_list = []
         for i in range(self.board_size): 
             for j in range(self.board_size): 
-                if not self.map.check_in_bounds(i,j): 
+                spot_list.append([i,j])
+
+        random.shuffle(spot_list)
+        for coord in spot_list:
+            i = coord[0]
+            j = coord[1]
+            if not self.map.check_in_bounds(i,j): 
+                continue
+            match self.map.get_element_at(i,j): 
+                case 0: 
+                    # Empty
                     continue
-                match self.map.get_element_at(i,j): 
-                    case 0: 
-                        # Empty
+                case 1:  
+                    # Just Person
+                    num_infected = self.map.get_infected_surrounding(i,j) 
+                    if num_infected == 0: 
+                         continue
+                     ## Move to the safest empty square 
+                    safest_square = self.map.get_safest_surrounding(i,j)
+                    if safest_square is not None: 
+                        print("Moving to",safest_square[0],safest_square[1])
+                        self.map.move_to(i,j,safest_square[0],safest_square[1])
+                    continue
+                case 2: 
+                    # Nurse
+                    endangered_node = self.map.get_most_infected_neighbour(i,j)
+                    if endangered_node is not None: 
+                        endangered_node.clear_diseases()
+                    continue
+                case 3: 
+                    # Person with diseases
+                    # self.map.infect_surrounding(i,j)
+                    print("Moving infected at",i,j)
+                    if new_map.is_nurse_adjacent(i,j):
                         continue
-                    case 1:  
-                        # Just Person
-                        # num_infected = self.map.get_infected_surrounding(i,j) 
-                        # if num_infected == 0: 
-                        #     continue
-                        # ## Move to the safest empty square 
-                        # safest_square = self.map.get_safest_surrounding(i,j)
-                        # if safest_square is not None: 
-                        #     print("Moving to",safest_square[0],safest_square[1])
-                        #     self.map.move_to(i,j,safest_square[0],safest_square[1])
+                    nurse_coords = new_map.get_closest_nurse(i,j)
+                    if nurse_coords is None: 
+                        # Could just do random move 
                         continue
-                    case 2: 
-                        # Nurse
-                        # endangered_node = self.map.get_most_infected_neighbour(i,j)
-                        # if endangered_node is not None: 
-                        #     endangered_node.clear_diseases()
-                        continue
-                    case 3: 
-                        # Person with diseases
-                        # self.map.infect_surrounding(i,j)
-                        print("Moving infected at",i,j)
-                        if new_map.is_nurse_adjacent(i,j):
-                            continue
-                        nurse_coords = new_map.get_closest_nurse(i,j)
-                        if nurse_coords is None: 
-                            # Could just do random move 
-                            continue
-                        best_move = new_map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
-                        print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
-                        new_map.move_to(i,j,best_move[0],best_move[1])
-                        continue
+                    best_move = new_map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
+                    print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
+                    new_map.move_to(i,j,best_move[0],best_move[1])
+                    continue
         self.map = new_map
     
     def view(self):
