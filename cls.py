@@ -2,6 +2,7 @@ import random
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 from queue import Queue
 import copy
 from enum import Enum
@@ -360,8 +361,16 @@ class Simulation:
 
         self.map = new_map
     
+    def run(self, steps=50, delay=0.5):
+        """Run the simulation for a given number of steps and show each step in stop-motion."""
+        for _ in range(steps):
+            self.step()  # Advance the simulation by one step
+            self.view()  # Show the current state after this step
+            plt.pause(delay)  # Pause for the specified delay (in seconds) between each step
+            plt.clf()  # Clear the current figure to prepare for the next step
+    
     def view(self):
-        """Visualize the grid using matplotlib."""
+        """Visualize the grid using matplotlib without blocking execution."""
         grid = np.zeros((self.board_size, self.board_size))
         
         for i in range(self.board_size):
@@ -370,8 +379,25 @@ class Simulation:
         
         plt.imshow(grid, cmap='viridis', interpolation='nearest')
         plt.colorbar(label='0 = Empty, 1 = Person, 2 = Nurse')
-        plt.title("Randomly Placed Clusters with People and Nurses")
-        plt.show()
+        plt.title(f"Simulation Step: {self.iterations}")
+        # Don't call plt.show() here, as it blocks the process.
 
-    def show_map(self): 
-        return self.map.get_map()
+    def animate(self, steps=50, interval=200):
+        """Animate the simulation for a given number of steps."""
+        
+        fig, ax = plt.subplots()
+
+        def update(frame):
+            self.step()  # Advance the simulation by one step
+            ax.clear()  # Clear previous frame
+            grid = np.zeros((self.board_size, self.board_size))
+            
+            for i in range(self.board_size):
+                for j in range(self.board_size):
+                    grid[i][j] = self.map.get_element_at(i, j).value
+            
+            ax.imshow(grid, cmap='viridis', interpolation='nearest')
+            ax.set_title(f"Simulation Step: {self.iterations}")
+
+        ani = animation.FuncAnimation(fig, update, frames=steps, interval=interval)
+        plt.show()
