@@ -396,8 +396,11 @@ class Simulation:
                 for j in range(self.board_size):
                     grid[i][j] = self.map.get_element_at(i, j).value
             
+            print(f"Frame {frame}: {grid}")  # Debugging: print grid values
             ax.imshow(grid, cmap='viridis', interpolation='nearest')
             ax.set_title(f"Simulation Step: {self.iterations}")
 
-        ani = animation.FuncAnimation(fig, update, frames=steps, interval=interval)
+        self.ani = animation.FuncAnimation(fig, update, frames=steps, interval=interval)
         plt.show()
+
+        
