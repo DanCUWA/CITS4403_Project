@@ -217,6 +217,8 @@ class Map:
     def make_random_move(self,i,j):
         options = [x for x in self.get_neighbours(i,j) if x[0] is None]
         # print("Choosing from",options)
+        if len(options) == 0:
+            return None
         choice = random.choice(options)
         # print("Chose",choice)
         self.move_to(i,j,choice[1],choice[2])
@@ -479,6 +481,10 @@ class Simulation:
     def show_map(self): 
         return self.map.get_map()
     
+    def run_to_end(self): 
+        while self.map.check_end() is False:
+            self.step()
+
     def end(self): 
         total_possible = 0
         total_matched = 0
@@ -489,8 +495,8 @@ class Simulation:
             total_possible += len(self.map.get_neighbours(i,j))
             total_matched += self.map.get_num_neighbours(i,j)
         print(total_matched,"starting neighbours out of",total_possible,"possible")
-        print("Started with",self.start_count,"people.\nEnded with",self.map.get_total_people(),
-              ".\n", self.start_count - self.map.get_total_people() ,"people died.")
+        print("Started with",self.start_count,"people.\nEnded with "+str(self.map.get_total_people()) 
+              + ".\n" + str(self.start_count - self.map.get_total_people()),"people died in",self.iterations,"iterations.")
         print("Ended because of:",self.map.check_end())
         print("Started at:")
         self.view(chosen_map=self.starting_map)
