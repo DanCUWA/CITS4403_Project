@@ -2,6 +2,8 @@ import random
 import time
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.cm as cm
+from matplotlib.colors import ListedColormap
 from queue import Queue
 import copy
 from enum import Enum
@@ -364,8 +366,8 @@ class Map:
             return Condition.NO_PEOPLE
         if not any_infected: 
             return Condition.NO_INFECTED
-        if not any_nurses: 
-            return Condition.NO_NURSES
+        # if not any_nurses: 
+        #     return Condition.NO_NURSES
         return False
 
 class Simulation: 
@@ -473,8 +475,12 @@ class Simulation:
                 else: 
                     grid[i][j] = chosen_map.get_element_at(i,j).value
         
-        plt.imshow(grid, cmap='viridis', interpolation='nearest')
-        plt.colorbar(label='0 = Empty, 1 = Person, 2 = Nurse')
+        bounds = [0, 1, 2, 3 ]
+        cmap = 'viridis'
+        norm = plt.Normalize(vmin=bounds[0], vmax=bounds[-1])
+
+        plt.imshow(grid, cmap=cmap, norm=norm, interpolation='nearest')
+        plt.colorbar(label='0 = Empty, 1 = Person, 2 = Nurse, 3 = Infected',cmap=cmap,norm=norm)
         plt.title("Randomly Placed Clusters with People and Nurses")
         plt.show()
 
