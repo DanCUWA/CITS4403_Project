@@ -6,6 +6,13 @@ from queue import Queue
 import copy
 from enum import Enum
 import uuid
+
+class Condition(Enum): 
+    NO_INFECTED = 0
+    NO_NURSES = 1
+    NO_PEOPLE = 2
+    NO_INFECTED_OR_NURSES = 3
+
 class Tile(Enum): 
     EMPTY = 0
     PERSON = 1
@@ -69,6 +76,7 @@ class Person:
                 print("Health decreased")
                 self.health -= 1 
         return self.health
+    
 # The Disease class acts as the secondary Agent for our scenario.
 class Disease:
     def __init__(self): 
@@ -79,8 +87,11 @@ class Disease:
         # Unique identifier to prevent duplicates
         self.name = uuid.uuid4()
 
-    def infect_person(self,map):
-        map.get_random_person().add_disease(copy.deepcopy(self))
+    def infect_random(self,map):
+        # print(map.get_random_person())
+        rand_coords = map.get_random_person()
+        map.board[rand_coords[0]][rand_coords[1]].add_disease(copy.deepcopy(self))
+        return rand_coords
 
     def will_spread(self): 
         return random.random() < self.infectivity
@@ -161,7 +172,7 @@ class Map:
             self.board[i][j] = Person(prob_nurse=self.prob_nurse)
 
     def get_random_person(self): 
-        return random.choice([person for row in self.board for person in row if person is not None and not person.is_nurse()])
+        return random.choice([[i,j] for i,row in enumerate(self.board) for j,col in enumerate(row) if self.get_element_at(i,j) == Tile.PERSON])
     
     def check_in_bounds(self,i,j): 
         return i >= 0 and i < self.size and j >= 0 and j < self.size 
@@ -291,6 +302,13 @@ class Map:
                 ret = [x,y]
             # print("distances",i,j,x,y,dist)
         return ret
+    
+    def get_num_neighbours(self,i,j): 
+        count = 0
+        for neighbour, ni, nj in self.get_neighbours(i,j):
+            if self.get_element_at(ni,nj) != Tile.EMPTY: 
+                count += 1
+        return count
 
     def get_distance_bewteen(self,i,j,i2,j2): 
         return np.sqrt((i - i2)**2 + (j - j2)**2)
@@ -314,7 +332,40 @@ class Map:
 
     def copy(self): 
         return copy.deepcopy(self)
-                
+
+    def get_total_people(self):
+        count = 0
+        for i in range(self.size): 
+            for j in range(self.size): 
+                if not self.check_in_bounds(i,j):
+                    continue
+                if self.get_element_at(i,j) != Tile.EMPTY:
+                    count += 1
+        return count   
+    
+    def check_end(self):
+        any_infected = False
+        any_nurses = False
+        any_people = False
+        grid = np.zeros((self.size, self.size))
+        for i in range(self.size): 
+            for j in range(self.size): 
+                if not self.check_in_bounds(i,j):
+                    continue
+                if self.get_element_at(i,j) == Tile.PERSON:
+                    any_people = True
+                if self.get_element_at(i,j) == Tile.INFECTED: 
+                    any_infected = True
+                if self.get_element_at(i,j) == Tile.NURSE:
+                    any_nurses = True
+        if not any_people: 
+            return Condition.NO_PEOPLE
+        if not any_infected: 
+            return Condition.NO_INFECTED
+        if not any_nurses: 
+            return Condition.NO_NURSES
+        return False
+
 class Simulation: 
 
     def __init__(self,board_size=100,num_clusters=4,prob_nurse=0.2,prob_person=0.4): 
@@ -322,21 +373,35 @@ class Simulation:
         self.num_clusters = num_clusters
         self.prob_nurse = prob_nurse
         self.prob_person = prob_person
+        self.initial_hotspots = list()
+        self.starting_map = None
+        self.start_count = 0
         self.map = Map(board_size,num_clusters,prob_nurse=prob_nurse,prob_person=prob_person)
         self.disease_choices = list()
         self.iterations = 0
         self.previous = None
+        self.running = False
 
 
     def add_disease_option(self): 
         self.disease_choices.append(Disease())
 
     def start(self): 
+        self.start_count = self.map.get_total_people()
         self.add_disease_option()
+        # self.add_disease_option()
         for disease in self.disease_choices: 
-            disease.infect_person(self.map)
+            num_to_infect = random.randint(1,4)
+            print("Infecting",num_to_infect)
+            for i in range(0,num_to_infect): 
+                self.initial_hotspots.append(disease.infect_random(self.map))
+        self.starting_map = self.map.copy()
 
     def step(self): 
+        if self.map.check_end() is not False:
+            print("Game Ended",self.map.check_end()) 
+            return
+
         self.iterations += 1 
         self.previous = self.map.copy()
         new_map = self.map.copy()
@@ -395,13 +460,16 @@ class Simulation:
                         continue
         self.map = new_map
     
-    def view(self):
+    def view(self,chosen_map=None):
         """Visualize the grid using matplotlib."""
         grid = np.zeros((self.board_size, self.board_size))
         
         for i in range(self.board_size):
             for j in range(self.board_size):
-                grid[i][j] = self.map.get_element_at(i,j).value
+                if chosen_map is None:
+                    grid[i][j] = self.map.get_element_at(i,j).value
+                else: 
+                    grid[i][j] = chosen_map.get_element_at(i,j).value
         
         plt.imshow(grid, cmap='viridis', interpolation='nearest')
         plt.colorbar(label='0 = Empty, 1 = Person, 2 = Nurse')
@@ -410,3 +478,22 @@ class Simulation:
 
     def show_map(self): 
         return self.map.get_map()
+    
+    def end(self): 
+        total_possible = 0
+        total_matched = 0
+        for hotspot in self.initial_hotspots: 
+            print(hotspot)
+            i = hotspot[0]
+            j = hotspot[1]
+            total_possible += len(self.map.get_neighbours(i,j))
+            total_matched += self.map.get_num_neighbours(i,j)
+        print(total_matched,"starting neighbours out of",total_possible,"possible")
+        print("Started with",self.start_count,"people.\nEnded with",self.map.get_total_people(),
+              ".\n", self.start_count - self.map.get_total_people() ,"people died.")
+        print("Ended because of:",self.map.check_end())
+        print("Started at:")
+        self.view(chosen_map=self.starting_map)
+        print("Finished at:")
+        self.view()
+
