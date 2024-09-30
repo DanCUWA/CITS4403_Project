@@ -33,6 +33,12 @@ class Person:
         self.diseases = list()
         if random.random() < prob_nurse: 
             self.nurse = True
+
+    def __str__(self):
+        ret = ""
+        for k in vars(self): 
+            ret += k+"->"+str(vars(self)[k])+" | "
+        return ret
     
     def is_nurse(self): 
         return self.nurse
@@ -102,6 +108,12 @@ class Disease:
 
     def will_spread(self): 
         return random.random() < self.infectivity
+
+    def __str__(self):
+        ret = ""
+        for k in vars(self): 
+            ret += k+"->"+str(vars(self)[k])+" | "
+        return ret
 
 
 ## The map acts as the environment for our scenario.
@@ -427,7 +439,6 @@ class Simulation:
         indices = [[x,y] for x in range(self.board_size) for y in range(self.board_size)]
         random.shuffle(indices)
         for i,j in indices: 
-            print("Moving",i,j)
             if not self.map.check_in_bounds(i,j): 
                 continue
             match self.map.get_element_at(i,j): 
@@ -580,3 +591,9 @@ class SimMetrics:
     
     def copy(self): 
         return copy.deepcopy(self)
+    
+    def __str__(self):
+        ret = ""
+        for k in vars(self): 
+            ret += k+":"+str(vars(self)[k])+" , "
+        return ret
