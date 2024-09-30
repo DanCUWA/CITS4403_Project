@@ -28,7 +28,8 @@ class Person:
         self.immunity = 0
         # Chance to resist disease
         self.natural_resistance = random.uniform(0.0,0.2)
-        self.health = random.randint(4,7)
+        self.starting_health = random.randint(4,7)
+        self.health = self.starting_health
         self.diseases = list()
         if random.random() < prob_nurse: 
             self.nurse = True
@@ -85,7 +86,7 @@ class Disease:
         # Chance to infect others
         self.infectivity = random.random()
         # Chance for disease to decrease health
-        self.mortality = random.uniform(0.7,1)
+        self.mortality = random.uniform(0.5,1)
         # Unique identifier to prevent duplicates
         self.name = uuid.uuid4()
 
@@ -377,37 +378,47 @@ class Simulation:
         self.num_clusters = num_clusters
         self.prob_nurse = prob_nurse
         self.prob_person = prob_person
-        self.initial_hotspots = list()
+        self.metrics = SimMetrics()
+        # self.initial_hotspots = list()
         self.starting_map = None
-        self.start_count = 0
+        # self.start_count = 0
         self.map = Map(board_size,num_clusters,prob_nurse=prob_nurse,prob_person=prob_person)
         self.disease_choices = list()
-        self.iterations = 0
-        self.previous = None
+        # self.dead = list()
+        # self.iterations = 0
+        # self.previous = None
         self.running = False
+        self.all_metrics = list()
 
+    def get_sim_params(self):
+        return [self.board_size,self.num_clusters,self.prob_nurse,self.prob_person]
 
+    def get_diseases(self): 
+        return self.disease_choices
+            
     def add_disease_option(self): 
         self.disease_choices.append(Disease())
 
     def start(self): 
-        self.start_count = self.map.get_total_people()
+        self.metrics.set_start_count(self.map.get_total_people())
         self.add_disease_option()
         # self.add_disease_option()
         for disease in self.disease_choices: 
             num_to_infect = random.randint(1,4)
             print("Infecting",num_to_infect)
             for i in range(0,num_to_infect): 
-                self.initial_hotspots.append(disease.infect_random(self.map))
-        self.starting_map = self.map.copy()
+                self.metrics.add_hotspot(disease.infect_random(self.map))
+        # self.starting_map = self.map.copy()
+        self.metrics.set_first_map(self.map.copy())
 
     def step(self): 
         if self.map.check_end() is not False:
-            print("Game Ended",self.map.check_end()) 
+            print("Simulation Ended",self.map.check_end()) 
             return
 
-        self.iterations += 1 
-        self.previous = self.map.copy()
+        # self.iterations += 1 
+        self.metrics.increment_iterations()
+        # self.previous = self.map.copy()
         new_map = self.map.copy()
         # print(new_map)
         for i in range(self.board_size): 
@@ -435,6 +446,7 @@ class Simulation:
                         endangered_node,ni,nj = new_map.get_most_infected_neighbour(i,j)
                         print("Neighbour",i,j,endangered_node)
                         if endangered_node is not None: 
+                            self.metrics.increment_healed()
                             new_map.board[ni][nj].clear_diseases()
                         continue
                     case Tile.INFECTED: 
@@ -442,17 +454,15 @@ class Simulation:
                         print("Node health is", cur_health)
                         if cur_health <= 0: 
                             print("Node died")
+                            self.metrics.add_dead(new_map.board[i][j])
                             new_map.board[i][j] = None
                             continue
                         # Person with diseases
                         new_map.infect_surrounding(i,j)
-
-                        
                         # print("Moving infected at",i,j)
                         if self.map.is_nurse_adjacent(i,j):
                             # print("Nurse adjacent to",i,j)
                             continue
-
                         nurse_coords = new_map.get_closest_nurse(i,j)
                         if nurse_coords is None: 
                             # Could just do random move 
@@ -463,6 +473,7 @@ class Simulation:
                         new_map.move_to(i,j,best_move[0],best_move[1])
                         continue
         self.map = new_map
+        self.all_metrics.append(StepMetrics(self.metrics.copy(),new_map.copy()))
     
     def view(self,chosen_map=None):
         """Visualize the grid using matplotlib."""
@@ -492,20 +503,75 @@ class Simulation:
             self.step()
 
     def end(self): 
+        total_matched, total_possible = self.metrics.get_hotspot_density()
+        print(total_matched,"starting neighbours out of",total_possible,"possible")
+        print("Started with",self.metrics.get_start_count(),"people. Ended with "+str(self.map.get_total_people()) 
+              + ". " + str(self.metrics.get_start_count() - self.map.get_total_people()),"people died in",self.metrics.iterations,"iterations.")
+        print("The following died:",self.metrics.get_dead())
+        print(f"{self.metrics.get_healed()} healed.")
+        print(f"Ended because of: {self.map.check_end()}")
+        print("Started at:")
+        self.view(chosen_map=self.metrics.get_first_map())
+        print("Finished at:")
+        self.view()
+
+class StepMetrics(): 
+    def __init__(self,sim_metrics,map):
+        self.metrics = sim_metrics
+        self.metrics.set_first_map(map)
+
+class SimMetrics:
+    def __init__(self): 
+        self.dead = list()
+        self.num_healed = 0
+        self.iterations = 0
+        self.start_count = 0
+        self.initial_hotspots = list()
+        self.starting_map = None
+
+    def add_dead(self,person): 
+        self.dead.append(person)
+
+    def increment_healed(self):
+        self.num_healed += 1
+
+    def increment_iterations(self): 
+        self.iterations += 1 
+
+    def add_hotspot(self,hotspot): 
+        self.initial_hotspots.append(hotspot)
+    
+    def get_hotspot_density(self):
         total_possible = 0
         total_matched = 0
         for hotspot in self.initial_hotspots: 
             print(hotspot)
             i = hotspot[0]
             j = hotspot[1]
-            total_possible += len(self.map.get_neighbours(i,j))
-            total_matched += self.map.get_num_neighbours(i,j)
-        print(total_matched,"starting neighbours out of",total_possible,"possible")
-        print("Started with",self.start_count,"people.\nEnded with "+str(self.map.get_total_people()) 
-              + ".\n" + str(self.start_count - self.map.get_total_people()),"people died in",self.iterations,"iterations.")
-        print("Ended because of:",self.map.check_end())
-        print("Started at:")
-        self.view(chosen_map=self.starting_map)
-        print("Finished at:")
-        self.view()
+            total_possible += len(self.starting_map.get_neighbours(i,j))
+            total_matched += self.starting_map.get_num_neighbours(i,j)
+        return total_matched, total_possible
 
+    def set_first_map(self,map): 
+        self.starting_map = map
+
+    def get_first_map(self):
+        return self.starting_map
+    
+    def get_dead(self):
+        return self.dead.copy()
+    
+    def get_healed(self): 
+        return self.num_healed
+    
+    def set_start_count(self,num): 
+        self.start_count = num
+
+    def get_iterations(self): 
+        return self.iterations
+    
+    def get_start_count(self): 
+        return self.start_count
+    
+    def copy(self): 
+        return copy.deepcopy(self)
