@@ -75,7 +75,10 @@ class Person:
     
     def update_health(self): 
         for disease in self.diseases: 
-            if random.random() + self.natural_resistance < disease.mortality: 
+            if self.health == 1: 
+                if random.random() + self.natural_resistance < disease.kill_chance: 
+                    self.health -= 1
+            elif random.random() + self.natural_resistance < disease.mortality: 
                 print("Health decreased")
                 self.health -= 1 
         return self.health
@@ -87,6 +90,7 @@ class Disease:
         self.infectivity = random.random()
         # Chance for disease to decrease health
         self.mortality = random.uniform(0.5,1)
+        self.kill_chance = random.uniform(0.2,0.4)
         # Unique identifier to prevent duplicates
         self.name = uuid.uuid4()
 
@@ -420,58 +424,59 @@ class Simulation:
         self.metrics.increment_iterations()
         # self.previous = self.map.copy()
         new_map = self.map.copy()
-        # print(new_map)
-        for i in range(self.board_size): 
-            for j in range(self.board_size): 
-                if not self.map.check_in_bounds(i,j): 
+        indices = [[x,y] for x in range(self.board_size) for y in range(self.board_size)]
+        random.shuffle(indices)
+        for i,j in indices: 
+            print("Moving",i,j)
+            if not self.map.check_in_bounds(i,j): 
+                continue
+            match self.map.get_element_at(i,j): 
+                case Tile.EMPTY: 
+                    # Empty
                     continue
-                match self.map.get_element_at(i,j): 
-                    case Tile.EMPTY: 
-                        # Empty
+                case Tile.PERSON:  
+                    # Just Person
+                    num_infected = new_map.get_infected_surrounding(i,j) 
+                    if num_infected == 0: 
+                        new_map.make_random_move(i,j)
                         continue
-                    case Tile.PERSON:  
-                        # Just Person
-                        num_infected = new_map.get_infected_surrounding(i,j) 
-                        if num_infected == 0: 
-                            new_map.make_random_move(i,j)
-                            continue
-                        ## Move to the safest empty square 
-                        safest_square = new_map.get_safest_surrounding(i,j)
-                        if safest_square is not None: 
-                            # print("Moving to",safest_square[0],safest_square[1])
-                            new_map.move_to(i,j,safest_square[0],safest_square[1])
+                    ## Move to the safest empty square 
+                    safest_square = new_map.get_safest_surrounding(i,j)
+                    if safest_square is not None: 
+                        # print("Moving to",safest_square[0],safest_square[1])
+                        new_map.move_to(i,j,safest_square[0],safest_square[1])
+                    continue
+                case Tile.NURSE: 
+                    # Nurse
+                    endangered_node,ni,nj = new_map.get_most_infected_neighbour(i,j)
+                    print("Neighbour",i,j,endangered_node)
+                    if endangered_node is not None: 
+                        self.metrics.increment_healed()
+                        new_map.board[ni][nj].clear_diseases()
+                    continue
+                case Tile.INFECTED: 
+                    cur_health = new_map.board[i][j].update_health()
+                    print("Node health is", cur_health)
+                    if cur_health <= 0: 
+                        print("Node died")
+                        self.metrics.add_dead(new_map.board[i][j])
+                        new_map.board[i][j] = None
                         continue
-                    case Tile.NURSE: 
-                        # Nurse
-                        endangered_node,ni,nj = new_map.get_most_infected_neighbour(i,j)
-                        print("Neighbour",i,j,endangered_node)
-                        if endangered_node is not None: 
-                            self.metrics.increment_healed()
-                            new_map.board[ni][nj].clear_diseases()
+                    # Person with diseases
+                    new_map.infect_surrounding(i,j)
+                    # print("Moving infected at",i,j)
+                    if self.map.is_nurse_adjacent(i,j):
+                        # print("Nurse adjacent to",i,j)
                         continue
-                    case Tile.INFECTED: 
-                        cur_health = new_map.board[i][j].update_health()
-                        print("Node health is", cur_health)
-                        if cur_health <= 0: 
-                            print("Node died")
-                            self.metrics.add_dead(new_map.board[i][j])
-                            new_map.board[i][j] = None
-                            continue
-                        # Person with diseases
-                        new_map.infect_surrounding(i,j)
-                        # print("Moving infected at",i,j)
-                        if self.map.is_nurse_adjacent(i,j):
-                            # print("Nurse adjacent to",i,j)
-                            continue
-                        nurse_coords = new_map.get_closest_nurse(i,j)
-                        if nurse_coords is None: 
-                            # Could just do random move 
-                            new_map.make_random_move(i,j)
-                            continue
-                        best_move = new_map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
-                        # print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
-                        new_map.move_to(i,j,best_move[0],best_move[1])
+                    nurse_coords = new_map.get_closest_nurse(i,j)
+                    if nurse_coords is None: 
+                        # Could just do random move 
+                        new_map.make_random_move(i,j)
                         continue
+                    best_move = new_map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
+                    # print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
+                    new_map.move_to(i,j,best_move[0],best_move[1])
+                    continue
         self.map = new_map
         self.all_metrics.append(StepMetrics(self.metrics.copy(),new_map.copy()))
     
