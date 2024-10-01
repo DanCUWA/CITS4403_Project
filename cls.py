@@ -233,7 +233,7 @@ class Map:
         if self.board[i][j] is None: 
             # return "Empty"
             return Tile.EMPTY
-        if self.board[i][j].is_nurse():
+        elif self.board[i][j].is_nurse():
             # return "Nurse" 
             return Tile.NURSE
         elif self.board[i][j].is_sick(): 
@@ -552,18 +552,18 @@ class Simulation:
                     new_map.move_to(i,j,best_move[0],best_move[1])
                     continue
         self.map = new_map
-        self.update_statistics(num=1)
+        #self.update_statistics(num=1)
 
 
         # Track statistics for infected persons at this time step
-        infected_stats = self.track_infected_statistics()
-        print("Infected Person Stats:", infected_stats)
+        #infected_stats = self.track_infected_statistics()
+        #print("Infected Person Stats:", infected_stats)
 
         # Track overall simulation statistics at this time step
-        overall_stats = self.track_overall_statistics()
-        print("Overall Stats:", overall_stats)
+        #overall_stats = self.track_overall_statistics()
+        #print("Overall Stats:", overall_stats)
 
-        self.update_statistics(num=1)
+        #self.update_statistics(num=1)
         self.all_metrics.append(StepMetrics(self.metrics.copy(), new_map.copy()))
     
 
@@ -596,11 +596,20 @@ class Simulation:
 
     def run_to_end(self, max_steps=100): 
         infected_statistics = []
-        overall_statistics = []
+        infected_stats = self.track_infected_statistics()
+        overall_stats = self.track_overall_statistics()
+        n = self.get_infected_count()
+        if n > 1:
+            for row in range(self.get_infected_count()):
+                infected_statistics.append(infected_stats[row])
+        else:
+            infected_statistics.append(infected_stats)
+        overall_statistics = [self.track_overall_statistics()]
         current_step = 0
 
         while self.map.check_end() is False and current_step < max_steps:
             self.step()
+            self.view()
 
             # Track stats for each time step
             infected_stats = self.track_infected_statistics()
@@ -618,8 +627,9 @@ class Simulation:
             current_step += 1  # Increment the step count
 
         # Once the simulation is done or max steps reached, return the collected statistics
-        infected_df = pd.DataFrame(infected_statistics, columns=["Uninfected Count Near", "Total Squares Visited", "Time Step", "Infected X", "Infected Y"])
-        overall_df = pd.DataFrame(overall_statistics, columns=["Current Infected", "Total Deaths", "Total Healed", "Time Step"])
+        infected_df = pd.DataFrame(infected_statistics, columns=["Infected X", "Infected Y","Uninfected Count Near", "Total Squares Visited", "Time Step", ])
+
+        overall_df = pd.DataFrame(overall_statistics, columns=["Time Step","Current Infected", "Total Deaths", "Total Healed" ])
 
         return infected_df, overall_df
 
@@ -642,7 +652,8 @@ class Simulation:
         print("Finished at:")
         self.view()
 
-    def update_statistics(self,num):
+
+    """def update_statistics(self,num):
         if num==10:
             return "final"
         total_infected = 0
@@ -663,7 +674,7 @@ class Simulation:
         if self.checker(num)==0:
             stats = [self.infected_count,self.survived_count,self.metrics.iterations]
             return stats
-           
+          
     
     def get_statistics(self):
         return self.update_statistics(num=0)
@@ -677,10 +688,10 @@ class Simulation:
     
     def appended_stats(self):
         self.stats.append(self.update_statistics(num=0))
-        return self.stats
+        return self.stats"""
 
     def raw_stats(self): 
-        return []
+       return []
 
 #'''
     #new changes
@@ -702,13 +713,13 @@ class Simulation:
                     uninfected_within_two_spaces = 0
                     squares_to_visit = 0
 
-                    self.new_list = []
+                    #self.new_list = []
 
                     for x in range(i-2, i+3):
                         for y in range(j-2, j+3):
                             if x==i and y==j:
                                 continue
-                            if self.map.check_in_bounds(x, y):
+                            elif self.map.check_in_bounds(x, y):
                                 # If the tile is a person and not infected, increase uninfected count
                                 if self.map.get_element_at(x, y) == Tile.PERSON:
                                     uninfected_within_two_spaces += 1
@@ -718,13 +729,13 @@ class Simulation:
                     
 
 
-                    self.new_list = [i,j,
-                                uninfected_within_two_spaces,
-                                squares_to_visit,
-                                self.metrics.iterations]
+                #    self.new_list = [i,j,
+                        #        uninfected_within_two_spaces,
+                      #          squares_to_visit,
+                       #         self.metrics.iterations]
 
-                    if self.new_list not in self.old_list:
-                        self.old_list.append(self)
+                    #if self.new_list not in self.old_list:
+                     #   self.old_list.append(self)
 
                     # Store the statistics for the infected person at (i, j)
                     infected_stats.append(
@@ -734,6 +745,8 @@ class Simulation:
                         squares_to_visit,
                         self.metrics.iterations
                     ])
+                    continue
+                continue
 
         return infected_stats
 
@@ -749,12 +762,12 @@ class Simulation:
                     total_infected += 1
         
         # Store the overall statistics at the current time step
-        overall_stats = {
-            'time_step': self.metrics.iterations,
-            'total_infected': total_infected,
-            'total_deaths': total_deaths,
-            'total_healed': total_healed
-        }
+        overall_stats = [
+            self.metrics.iterations,
+            total_infected,
+            total_deaths,
+            total_healed
+        ]
 
         return overall_stats
 
