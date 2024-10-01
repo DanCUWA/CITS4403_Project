@@ -1,0 +1,150 @@
+---
+title: "CITS4403_simulation_study"
+output: html_document
+date: '2024-10-01'
+---
+
+
+#Load Libraries
+```{r}
+library(dplyr)
+library(ggplot2)
+library(shiny)
+library(GGally)
+
+```
+
+
+
+```{r}
+overall_stats <- read.csv("overall_stats.csv", header=T)
+overall_stats <- na.omit(overall_stats)
+str(overall_stats)
+summary(overall_stats)
+head(overall_stats)
+```
+
+```{r}
+infected_person_stats <- read.csv("infected_person_stats.csv", header=T)
+str(infected_person_stats)
+summary(infected_person_stats)
+head(infected_person_stats)
+infected_person_stats
+```
+
+```{r}
+infected_person_stats$clustering_coef <- infected_person_stats$Uninfected.Count.Near / infected_person_stats$Total.Squares.Visited
+
+infected_df <- with(infected_person_stats,data.frame(timeStep = as.factor(Time.Step),
+                                                     xCoord = as.integer(Infected.X),
+                                                     yCoord = as.integer(Infected.Y),
+                                                     Uninfected.Count.Near,
+                                                     Total.Squares.Visited,
+                                                     clustering_coef
+                                                     ))
+
+infected_df <-infected_df %>% mutate(across(-c(xCoord,yCoord,timeStep,clustering_coef), ~ as.integer(.)))
+
+head(infected_df)
+```
+
+```{r}
+infected_df <- na.omit(infected_df)
+```
+
+```{r}
+summary(infected_df)
+```
+
+```{r}
+# Calculate the average clustering coefficient per time step
+avg_clustering_coef_df <- infected_df %>%
+  group_by(timeStep) %>%
+  summarize(avg_clustering_coef = mean(clustering_coef, na.rm = TRUE))
+
+```
+
+```{r}
+# Plot average clustering coefficient over time steps
+ggplot(avg_clustering_coef_df, aes(x = as.numeric(as.character(timeStep)), y = avg_clustering_coef)) +
+  geom_line(color = "blue", size = 1.2) +
+  geom_point(color = "red", size = 2) +
+  labs(title = "Change in Average Clustering Coefficient Over Time",
+       x = "Time Step",
+       y = "Average Clustering Coefficient") +
+  theme_minimal()
+
+```
+
+```{r}
+colnames(overall_stats)[1] = "timeStep"
+colnames(overall_stats)
+
+
+# Convert the timeStep columns to the same type in both dataframes if necessary
+avg_clustering_coef_df$timeStep <- as.factor(avg_clustering_coef_df$timeStep)
+# Merge overall_stats with avg_clustering_coef_df
+overall_stats_with_clustering <- merge(overall_stats, avg_clustering_coef_df, by = "timeStep", all.x = TRUE)
+
+# Check structure, summary, and first few rows of the updated dataframe
+str(overall_stats_with_clustering)
+summary(overall_stats_with_clustering)
+head(overall_stats_with_clustering)
+overall_stats_with_clustering[7,5] = 0
+overall_stats_with_clustering
+```
+
+```{r}
+
+
+# Define UI for the app
+ui <- fluidPage(
+  titlePanel("Pairwise Plot of Variables"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      h3("Pairwise Plot Settings"),
+      helpText("This plot shows relationships between all variables in the data."),
+      # Add any additional inputs you want to customize the plot
+    ),
+    
+    mainPanel(
+      plotOutput("pairwisePlot")
+    )
+  )
+)
+
+# Define server logic for pairwise plot
+server <- function(input, output) {
+  
+  # Generate pairwise plot using GGally::ggpairs
+  output$pairwisePlot <- renderPlot({
+    # Pairwise plot of all variables in the dataset
+    ggpairs(overall_stats_with_clustering, title = "Pairwise Plot of All Variables")
+  })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+
+```
+
+```{r}
+# Load ggplot2
+library(ggplot2)
+
+# Create the plot
+ggplot(overall_stats_with_clustering, aes(x = avg_clustering_coef, y = Total.Deaths)) +
+  geom_point(color = "blue", size = 3) +    # Scatter plot points
+  geom_smooth(method = "lm", color = "red", se = TRUE) +  # Add linear regression line with confidence interval
+  labs(title = "Total Deaths vs. Average Clustering Coefficient",
+       x = "Average Clustering Coefficient",
+       y = "Total Deaths") +
+  theme_minimal()  # Apply a clean theme
+
+```
+
+
+
+
+
