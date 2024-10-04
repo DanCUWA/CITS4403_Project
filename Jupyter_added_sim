@@ -1,0 +1,12 @@
+from cls import *
+
+BOARDSIZE = 60
+NUM_CLUSTERS = 3
+PROB_NURSE = 0.05
+PROB_PERSON = 0.2
+
+sim = Simulation(board_size=BOARDSIZE, num_clusters=NUM_CLUSTERS,
+                 prob_nurse=PROB_NURSE, prob_person=PROB_PERSON)
+
+sim.start()
+sim.run(steps=50,delay=0.02)
