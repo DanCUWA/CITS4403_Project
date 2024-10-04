@@ -8,13 +8,13 @@ from queue import Queue
 import copy
 from enum import Enum
 import uuid
-
+# 
 class Condition(Enum): 
     NO_INFECTED = 0
     NO_NURSES = 1
     NO_PEOPLE = 2
     NO_INFECTED_OR_NURSES = 3
-
+# Numerical representation of board state.
 class Tile(Enum): 
     EMPTY = 0
     PERSON = 1
@@ -41,6 +41,7 @@ class Person:
         return ret
     
     def is_nurse(self): 
+
         return self.nurse
     
     def get_health(self): 
@@ -519,18 +520,21 @@ class Simulation:
             self.step()
 
     def end(self): 
-        total_matched, total_possible = self.metrics.get_hotspot_density()
-        print(total_matched,"starting neighbours out of",total_possible,"possible")
-        print("Started with",self.metrics.get_start_count(),"people. Ended with "+str(self.map.get_total_people()) 
-              + ". " + str(self.metrics.get_start_count() - self.map.get_total_people()),"people died in",self.metrics.iterations,"iterations.")
-        print("The following died:",self.metrics.get_dead())
-        print(f"{self.metrics.get_healed()} healed.")
+        # total_matched, total_possible = self.metrics.get_hotspot_density()
+        # print(total_matched,"starting neighbours out of",total_possible,"possible")
+        # print("Started with",self.metrics.get_start_count(),"people. Ended with "+str(self.map.get_total_people()) 
+        #       + ". " + str(self.metrics.get_start_count() - self.map.get_total_people()),"people died in",self.metrics.iterations,"iterations.")
+        # print("The following died:",self.metrics.get_dead())
+        # print(f"{self.metrics.get_healed()} healed.")
         print(f"Ended because of: {self.map.check_end()}")
-        print("Started at:")
-        self.view(chosen_map=self.metrics.get_first_map())
-        print("Finished at:")
-        self.view()
-
+        # print("Started at:")
+        # self.view(chosen_map=self.metrics.get_first_map())
+        # print("Finished at:")
+        # self.view()
+        for met in self.all_metrics: 
+            metric_cls : SimMetrics = met.metrics 
+            it = metric_cls.get_iterations()
+            print(it,str(metric_cls))
 class StepMetrics(): 
     def __init__(self,sim_metrics,map):
         self.metrics = sim_metrics
