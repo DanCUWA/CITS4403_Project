@@ -1,0 +1,315 @@
+---
+title: "Untitled"
+output: html_document
+date: '2024-10-03'
+---
+
+
+```{r}
+# Load necessary libraries
+library(dplyr)
+library(ggplot2)
+library(shiny)
+library(GGally)
+```
+
+
+```{r}
+# Define the function to read and process the data
+process_simulation_data <- function(PROB_NURSE, PROB_PERSON, sim_num) {
+  
+  # Create the filenames based on the probability values and sim_num
+  name <- paste0(strsplit(as.character(PROB_NURSE), "\\.")[[1]][2], "_", 
+                 strsplit(as.character(PROB_PERSON), "\\.")[[1]][2], "_", 
+                 as.character(sim_num))
+  
+  inf_name <- paste0("inf_", name, ".csv")
+  over_name <- paste0("over_", name, ".csv")
+  
+  # Read the datasets
+  infected_person_stats <- read.csv(inf_name, header = TRUE)
+  overall_stats <- read.csv(over_name, header = TRUE)
+  
+  # Data Cleaning and Processing
+  infected_person_stats$clustering_coef <- infected_person_stats$Uninfected.Count.Near / infected_person_stats$Total.Squares.Visited
+  
+  infected_df <- with(infected_person_stats, data.frame(
+    timeStep = as.factor(Time.Step),
+    xCoord = as.integer(Infected.X),
+    yCoord = as.integer(Infected.Y),
+    Uninfected.Count.Near,
+    Total.Squares.Visited,
+    clustering_coef
+  ))
+  
+  infected_df <- infected_df %>% mutate(across(-c(xCoord, yCoord, timeStep, clustering_coef), ~ as.integer(.)))
+  infected_df <- na.omit(infected_df)
+  
+  # Calculate the average clustering coefficient per time step
+  avg_clustering_coef_df <- infected_df %>%
+    group_by(timeStep) %>%
+    summarize(avg_clustering_coef = mean(clustering_coef, na.rm = TRUE))
+  
+  # Merge overall_stats with avg_clustering_coef_df
+  colnames(overall_stats)[1] <- "timeStep"
+  overall_stats$timeStep <- as.factor(overall_stats$timeStep)
+  overall_stats_with_clustering <- merge(overall_stats, avg_clustering_coef_df, by = "timeStep", all.x = TRUE)
+  
+  # Return the processed data
+  return(overall_stats_with_clustering)
+}
+```
+
+
+```{r}
+# Example usage of the function
+PROB_NURSE <- 0.05
+PROB_PERSON <- 0.2
+sim_num <- 1
+overall_stats_with_clustering <- process_simulation_data(PROB_NURSE, PROB_PERSON, sim_num)
+```
+
+```{r}
+# Example usage of the function
+PROB_NURSE <- 0.05
+PROB_PERSON <- 0.2
+sim_num <- 2
+overall_stats_with_clustering2 <- process_simulation_data(PROB_NURSE, PROB_PERSON, sim_num)
+```
+
+```{r}
+# Example usage of the function
+PROB_NURSE <- 0.15
+PROB_PERSON <- 0.7
+sim_num <- 1
+overall_stats_with_clustering <- process_simulation_data(PROB_NURSE, PROB_PERSON, sim_num)
+
+      
+
+# Assuming 'dataframe' is the name of your dataframe and 'column_name' is the name of the column
+overall_stats_with_clustering <- overall_stats_with_clustering %>%
+  mutate(avg_clustering_coef = ifelse(is.na(avg_clustering_coef), 0, avg_clustering_coef))
+
+overall_stats_with_clustering
+```
+
+```{r}
+
+# Example usage of the function
+PROB_NURSE <- 0.01
+PROB_PERSON <- 0.7
+sim_num <- 1
+overall_stats_with_clustering <- process_simulation_data(PROB_NURSE, PROB_PERSON, sim_num)
+
+      
+
+# Assuming 'dataframe' is the name of your dataframe and 'column_name' is the name of the column
+overall_stats_with_clustering <- overall_stats_with_clustering %>%
+  mutate(avg_clustering_coef = ifelse(is.na(avg_clustering_coef), 0, avg_clustering_coef))
+
+overall_stats_with_clustering
+```
+
+
+
+
+```{r}
+# Define UI for the app
+ui <- fluidPage(
+  titlePanel("Pairwise Plot of Variables"),
+  
+  sidebarLayout(
+    sidebarPanel(
+      h3("Pairwise Plot Settings"),
+      helpText("This plot shows relationships between all variables in the data."),
+      # Add any additional inputs you want to customize the plot
+    ),
+    
+    mainPanel(
+      plotOutput("pairwisePlot")
+    )
+  )
+)
+
+# Define server logic for pairwise plot
+server <- function(input, output) {
+  
+  # Generate pairwise plot using GGally::ggpairs
+  output$pairwisePlot <- renderPlot({
+    # Pairwise plot of all variables in the dataset
+    ggpairs(overall_stats_with_clustering, title = "Pairwise Plot of All Variables")
+  })
+}
+
+# Run the application 
+shinyApp(ui = ui, server = server)
+```
+
+```{r}
+cor(overall_stats_with_clustering[,-c(1)])
+str(overall_stats_with_clustering2[,-c(1)])
+```
+
+```{r}
+overall_stats_with_clustering
+```
+```{r}
+pairs(overall_stats_with_clustering)
+```
+
+
+```{r}
+# Plotting the relationship between Total Deaths and Average Clustering Coefficient
+ggplot(overall_stats_with_clustering, aes(x = avg_clustering_coef, y = Total.Deaths)) +
+  geom_point(color = "blue", size = 3) +    # Scatter plot points
+  geom_smooth(method = "lm", color = "red", se = TRUE) +  # Add linear regression line with confidence interval
+  labs(title = "Total Deaths vs. Average Clustering Coefficient",
+       x = "Average Clustering Coefficient",
+       y = "Total Deaths") +
+  theme_minimal()  # Apply a clean theme
+```
+
+
+
+```{r}
+# Plotting the relationship between Total Deaths and Average Clustering Coefficient
+ggplot(overall_stats_with_clustering, aes(x = timeStep, y = Total.Deaths)) +
+  geom_point(color = "blue", size = 3) +    # Scatter plot points
+  geom_smooth(method = "lm", color = "red", se = TRUE) +  # Add linear regression line with confidence interval
+  labs(title = "Total Deaths vs. TimeStep",
+       x = "TimeStep",
+       y = "Total Deaths") +
+  theme_minimal()  # Apply a clean theme
+```
+
+
+
+```{r}
+for(i in (as.integer(overall_stats_with_clustering$timeStep[-1]))){
+  print(i)
+}
+```
+
+
+```{r}
+#overall_stats_with_clustering
+overall_stats_with_clustering$new_healed[1] <- 0
+overall_stats_with_clustering$new_infected[1] <- overall_stats_with_clustering$Current.Infected[1]
+overall_stats_with_clustering$new_deaths[1] <- 0
+
+for(i in as.integer(overall_stats_with_clustering$timeStep[-1])){
+  overall_stats_with_clustering$new_healed[i] <- overall_stats_with_clustering$Total.Healed[i] - overall_stats_with_clustering$Total.Healed[i-1]
+    overall_stats_with_clustering$new_deaths[i] <- overall_stats_with_clustering$Total.Deaths[i] - overall_stats_with_clustering$Total.Deaths[i-1]
+  overall_stats_with_clustering$new_infected[i] <- overall_stats_with_clustering$Current.Infected[i] - overall_stats_with_clustering$Current.Infected[i-1] + overall_stats_with_clustering$new_deaths[i] + overall_stats_with_clustering$new_healed[i]
+  print(i)
+}
+
+overall_stats_with_clustering
+
+
+```
+
+```{r}
+
+
+# Create the plot
+ggplot(overall_stats_with_clustering, aes(x = as.numeric(as.character(timeStep)), y = new_infected)) +
+  geom_line(color = "blue", size = 1) +    # Line plot for new infections
+  geom_point(color = "red", size = 2) +    # Points on the line for each time step
+  labs(title = "New Infected vs Time Step",
+       x = "Time Step",
+       y = "New Infected") +
+  theme_minimal()  # Clean theme for better visualization
+
+```
+
+
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# Create the plot with both line and bar graphs
+ggplot(overall_stats_with_clustering, aes(x = as.numeric(as.character(timeStep)))) +
+  
+  # Column graph for new deaths
+  geom_bar(aes(y = new_deaths), stat = "identity", fill = "orange", alpha = 0.5) +
+  
+  # Line plot for new infections
+  geom_line(aes(y = new_infected), color = "blue", size = 1.5) +
+  geom_point(aes(y = new_infected), color = "red", size = 2) +
+  
+  # Labels and theme
+  labs(title = "New Infected and New Deaths vs Time Step",
+       x = "Time Step",
+       y = "Count") +
+  
+  theme_minimal()  # Clean theme for better visualization
+
+```
+
+
+
+```{r}
+# Load necessary library
+library(ggplot2)
+
+# Create the plot with line and two column graphs
+ggplot(overall_stats_with_clustering, aes(x = as.numeric(as.character(timeStep)))) +
+  
+  # Column graph for new deaths
+  geom_bar(aes(y = new_deaths), stat = "identity", fill = "orange", alpha = 0.5) +
+  
+  # Column graph for new healed
+  geom_bar(aes(y = new_healed), stat = "identity", fill = "green", alpha = 0.5) +
+  
+  # Line plot for new infected
+  geom_line(aes(y = new_infected), color = "blue", size = 1.5) +
+  geom_point(aes(y = new_infected), color = "red", size = 2) +
+  
+  # Labels and theme
+  labs(title = "New Infected, New Deaths, and New Healed vs Time Step",
+       x = "Time Step",
+       y = "Count") +
+  
+  theme_minimal()  # Clean theme for better visualization
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

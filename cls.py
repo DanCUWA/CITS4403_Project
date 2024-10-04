@@ -8,6 +8,10 @@ from queue import Queue
 import copy
 from enum import Enum
 import uuid
+import heapq
+import pandas as pd
+
+
 
 class Condition(Enum): 
     NO_INFECTED = 0
@@ -238,6 +242,51 @@ class Map:
         self.cluster_props = self.assign_cluster_probabilities()
         self.place_clusters()
 
+    def dijkstra(self, start_i, start_j):
+        """Use Dijkstra's algorithm to find the shortest path from (start_i, start_j) to all nurses."""
+        # Priority queue to hold the cells to be processed
+        pq = []
+        # Distance dictionary to hold the shortest distance to each cell
+        distances = { (i, j): float('inf') for i in range(self.size) for j in range(self.size) }
+        # Dictionary to store only the distances to nurses
+        nurse_distances = {}
+        
+        # Initialize the start point's distance
+        distances[(start_i, start_j)] = 0
+        heapq.heappush(pq, (0, (start_i, start_j)))  # (distance, (i, j))
+
+        while pq:
+            current_distance, (current_i, current_j) = heapq.heappop(pq)
+
+            # If this distance is greater than the recorded distance, skip it
+            if current_distance > distances[(current_i, current_j)]:
+                continue
+
+            # Explore neighbors
+            for neighbour, ni, nj in self.get_neighbours(current_i, current_j):
+                if self.get_element_at(ni, nj) == Tile.EMPTY:
+                    distance = current_distance + 1  # All moves have a cost of 1                    
+                    if distance < distances[(ni, nj)]:
+                        distances[(ni, nj)] = distance
+                        heapq.heappush(pq, (distance, (ni, nj)))
+                        
+                        # If the neighbor is a nurse, add it to the nurse_distances dictionary
+                        if self.get_element_at(ni, nj) == Tile.NURSE:
+                            nurse_distances[(ni, nj)] = distance
+                if self.get_element_at(ni, nj) == Tile.NURSE:
+                    distance = current_distance
+                    if distance < distances[(ni, nj)]:
+                        distances[(ni, nj)] = distance
+                        heapq.heappush(pq, (distance, (ni, nj)))  
+                        # If the neighbor is a nurse, add it to the nurse_distances dictionary
+                        if self.get_element_at(ni, nj) == Tile.NURSE:
+                            nurse_distances[(ni, nj)] = distance
+            
+        print(nurse_distances)
+        return nurse_distances
+
+
+
     def generate_array(self): 
         """
             Initialise an empty 2D array of the correct size. 
@@ -357,7 +406,7 @@ class Map:
         """ 
         if self.board[i][j] is None: 
             return Tile.EMPTY
-        if self.board[i][j].is_nurse():
+        elif self.board[i][j].is_nurse():
             return Tile.NURSE
         elif self.board[i][j].is_sick(): 
             return Tile.INFECTED
@@ -712,6 +761,14 @@ class Simulation:
         self.running = False
         # Holds metrics for all individual steps. 
         self.all_metrics = list()
+        # self.dead = list()
+        #self.iterations = 0
+        # self.previous = None
+        self.running = False
+        self.stats = [["infected","not infected", "time step"]]
+        self.new_list = list()
+        self.old_list = list()
+        self.infected_count = 0
 
     def get_sim_params(self):
         return [self.board_size,self.num_clusters,self.prob_nurse,self.prob_person]
@@ -783,21 +840,45 @@ class Simulation:
                     # Person with diseases
                     new_map.infect_surrounding(i,j)
                     # print("Moving infected at",i,j)
+
+
                     if self.map.is_nurse_adjacent(i,j):
                         # print("Nurse adjacent to",i,j)
                         continue
+                    
+                    distances = new_map.dijkstra(i, j)
+                    # Find the closest nurse position
+                    closest_nurse_coords = None
+                    min_distance = float('inf')
+                    for coords, distance in distances.items():
+                        if new_map.get_element_at(coords[0], coords[1]) == Tile.NURSE and distance < min_distance:
+                            min_distance = distance
+                            closest_nurse_coords = coords
                     nurse_coords = new_map.get_closest_nurse(i,j)
+
+                    if closest_nurse_coords is not None:
+                        # Move towards the closest nurse
+                        best_move = new_map.get_best_move_from_to(i, j, closest_nurse_coords[0], closest_nurse_coords[1])
+                        new_map.move_to(i, j, best_move[0], best_move[1])
+                        new_map.infect_surrounding(best_move[0],best_move[1])
+                        continue
                     if nurse_coords is None: 
                         # Could just do random move 
                         new_map.make_random_move(i,j)
                         continue
                     best_move = new_map.get_best_move_from_to(i,j,nurse_coords[0],nurse_coords[1])
                     # print("Infected at",i,j,"optimal move is",best_move,"to nurse at",nurse_coords)
-                    new_map.move_to(i,j,best_move[0],best_move[1])
+                    try:
+                        new_map.move_to(i,j,best_move[0],best_move[1])
+                    except TypeError:
+                        print("Infected patient could not move since hospital/nurse met patient capacity.")
+                        continue
                     continue
         self.map = new_map
-        self.all_metrics.append(StepMetrics(self.metrics.copy(),new_map.copy()))
+        self.all_metrics.append(StepMetrics(self.metrics.copy(), new_map.copy()))
     
+
+
     def view(self,chosen_map=None):
         """Visualize the grid using matplotlib."""
         grid = np.zeros((self.board_size, self.board_size))
@@ -821,9 +902,51 @@ class Simulation:
     def show_map(self): 
         return self.map.get_map()
     
-    def run_to_end(self): 
-        while self.map.check_end() is False:
+
+    import pandas as pd
+
+    def run_to_end(self, max_steps=100): 
+        infected_statistics = []
+        infected_stats = self.track_infected_statistics()
+        overall_stats = self.track_overall_statistics()
+        n = self.get_infected_count()
+        if n > 1:
+            for row in range(self.get_infected_count()):
+                infected_statistics.append(infected_stats[row])
+        else:
+            infected_statistics.append(infected_stats)
+        overall_statistics = [self.track_overall_statistics()]
+        current_step = 0
+
+        while self.map.check_end() is False and current_step < max_steps:
             self.step()
+            self.view()
+
+            # Track stats for each time step
+            infected_stats = self.track_infected_statistics()
+            overall_stats = self.track_overall_statistics()
+
+            # Append stats to the list to store them
+            n = self.get_infected_count()
+            if n > 1:
+                for row in range(self.get_infected_count()):
+                    infected_statistics.append(infected_stats[row])
+            else:
+                infected_statistics.append(infected_stats)
+            overall_statistics.append(overall_stats)
+
+            current_step += 1  # Increment the step count
+
+        # Once the simulation is done or max steps reached, return the collected statistics
+        infected_df = pd.DataFrame(infected_statistics, columns=["Infected X", "Infected Y","Uninfected Count Near", "Total Squares Visited", "Time Step", ])
+
+        overall_df = pd.DataFrame(overall_statistics, columns=["Time Step","Current Infected", "Total Deaths", "Total Healed" ])
+
+        return infected_df, overall_df
+
+
+
+
 
     def end(self): 
         # total_matched, total_possible = self.metrics.get_hotspot_density()
@@ -832,15 +955,113 @@ class Simulation:
         #       + ". " + str(self.metrics.get_start_count() - self.map.get_total_people()),"people died in",self.metrics.iterations,"iterations.")
         # print("The following died:",self.metrics.get_dead())
         # print(f"{self.metrics.get_healed()} healed.")
+        # print(f"Ended because of: {self.map.check_end()}")
+        # # print("Started at:")
+        # # self.view(chosen_map=self.metrics.get_first_map())
+        # # print("Finished at:")
+        # # self.view()
+        # for met in self.all_metrics: 
+        #     metric_cls : SimMetrics = met.metrics 
+        #     it = metric_cls.get_iterations()
+        #     print(it,str(metric_cls))
+        description,total_matched, total_possible = self.metrics.get_hotspot_density()
+        print(description,total_matched,"starting neighbours out of",total_possible,"possible")
+        print("Started with",self.metrics.get_start_count(),"people. Ended with "+str(self.map.get_total_people()) 
+              + ". " + str(self.metrics.get_start_count() - self.map.get_total_people()),"people died in",self.metrics.iterations,"iterations.")
+        print("The following died:",self.metrics.get_dead())
+        print(f"{self.metrics.get_healed()} healed.")
         print(f"Ended because of: {self.map.check_end()}")
-        # print("Started at:")
-        # self.view(chosen_map=self.metrics.get_first_map())
-        # print("Finished at:")
-        # self.view()
-        for met in self.all_metrics: 
-            metric_cls : SimMetrics = met.metrics 
-            it = metric_cls.get_iterations()
-            print(it,str(metric_cls))
+        for i in self.all_metrics: 
+            print("")
+        print("Started at:")
+        self.view(chosen_map=self.metrics.get_first_map())
+        print("Finished at:")
+        self.view()
+
+
+    def raw_stats(self): 
+       return []
+
+#'''
+    #new changes
+    def get_infected_count(self):
+        self.infected_count = 0
+        for i in range(self.board_size):
+            for j in range(self.board_size):
+                if self.map.get_element_at(i, j) == Tile.INFECTED:
+                        self.infected_count +=1
+        return self.infected_count
+
+
+    def track_infected_statistics(self):
+        infected_stats = []
+        for i in range(self.board_size):
+            for j in range(self.board_size):
+                if self.map.get_element_at(i, j) == Tile.INFECTED:
+                    # Count uninfected persons within two spaces
+                    uninfected_within_two_spaces = 0
+                    squares_to_visit = 0
+
+                    #self.new_list = []
+
+                    for x in range(i-2, i+3):
+                        for y in range(j-2, j+3):
+                            if x==i and y==j:
+                                continue
+                            elif self.map.check_in_bounds(x, y):
+                                # If the tile is a person and not infected, increase uninfected count
+                                if self.map.get_element_at(x, y) == Tile.PERSON:
+                                    uninfected_within_two_spaces += 1
+                                # Count the number of empty squares the infected person can visit
+                                if self.map.get_element_at(x, y) == Tile.EMPTY or self.map.get_element_at(x, y) == Tile.PERSON:
+                                    squares_to_visit += 1
+                    
+
+
+                #    self.new_list = [i,j,
+                        #        uninfected_within_two_spaces,
+                      #          squares_to_visit,
+                       #         self.metrics.iterations]
+
+                    #if self.new_list not in self.old_list:
+                     #   self.old_list.append(self)
+
+                    # Store the statistics for the infected person at (i, j)
+                    infected_stats.append(
+                        [i,
+                        j,
+                        uninfected_within_two_spaces,
+                        squares_to_visit,
+                        self.metrics.iterations
+                    ])
+                    continue
+                continue
+
+        return infected_stats
+
+    def track_overall_statistics(self):
+        total_infected = 0
+        total_deaths = len(self.metrics.get_dead())
+        total_healed = self.metrics.get_healed()
+
+        # Count current number of infected people
+        for i in range(self.board_size):
+            for j in range(self.board_size):
+                if self.map.get_element_at(i, j) == Tile.INFECTED:
+                    total_infected += 1
+        
+        # Store the overall statistics at the current time step
+        overall_stats = [
+            self.metrics.iterations,
+            total_infected,
+            total_deaths,
+            total_healed
+        ]
+
+        return overall_stats
+
+    #ended here
+#'''
 class StepMetrics(): 
     def __init__(self,sim_metrics,map):
         self.metrics = sim_metrics
@@ -876,7 +1097,7 @@ class SimMetrics:
             j = hotspot[1]
             total_possible += len(self.starting_map.get_neighbours(i,j))
             total_matched += self.starting_map.get_num_neighbours(i,j)
-        return total_matched, total_possible
+        return ["hotspots",total_matched, total_possible]
 
     def set_first_map(self,map): 
         self.starting_map = map
