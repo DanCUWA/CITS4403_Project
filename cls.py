@@ -682,23 +682,40 @@ class Map:
         #     return Condition.NO_NURSES
         return False
 
+"""
+The class responsible for incorporating the previous elements 
+and running a simulation instance.
+"""
 class Simulation: 
-
+    """
+    Constructor for the Simulation class.
+    Parameters: 
+        int board_size:           The size of the board. 
+                                  Default 100. 
+        int num_clusters:         The number of clusters to start with
+                                    on the board.
+                                  Default 4
+        float prob_nurse:         Probability that a new
+                                    person is a nurse.
+                                  Default 0.2 
+        float prob_person:        Probability that an empty square on 
+                                    the first map is a person.
+                                  Default 0.4
+    """
     def __init__(self,board_size=100,num_clusters=4,prob_nurse=0.2,prob_person=0.4): 
         self.board_size = board_size
         self.num_clusters = num_clusters
         self.prob_nurse = prob_nurse
         self.prob_person = prob_person
-        self.metrics = SimMetrics()
-        # self.initial_hotspots = list()
+        # Copy of the first map 
         self.starting_map = None
-        # self.start_count = 0
+        # The current map 
         self.map = Map(board_size,num_clusters,prob_nurse=prob_nurse,prob_person=prob_person)
+        # The list of possible diseases for the current simulation
         self.disease_choices = list()
-        # self.dead = list()
-        # self.iterations = 0
-        # self.previous = None
+        # Whether or not the simulation has terminated
         self.running = False
+        # Holds metrics for all individual steps. 
         self.all_metrics = list()
 
     def get_sim_params(self):
