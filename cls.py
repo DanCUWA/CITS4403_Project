@@ -750,6 +750,7 @@ class Simulation:
         self.num_clusters = num_clusters
         self.prob_nurse = prob_nurse
         self.prob_person = prob_person
+        # Hold simulation-wide metrics
         self.metrics = SimMetrics()
         # Copy of the first map 
         self.starting_map = None
@@ -759,27 +760,40 @@ class Simulation:
         self.disease_choices = list()
         # Whether or not the simulation has terminated
         self.running = False
-        # Holds metrics for all individual steps. 
+        # Holds step-specific metrics for all steps. 
         self.all_metrics = list()
-        # self.dead = list()
-        #self.iterations = 0
-        # self.previous = None
-        self.running = False
         self.stats = [["infected","not infected", "time step"]]
         self.new_list = list()
         self.old_list = list()
-        self.infected_count = 0
+        # self.infected_count = 0
 
     def get_sim_params(self):
+        """ 
+            Retrieves the initial parameters used to run the simulation. 
+            Returns: 
+                arr[4]:     Initial parameters
+        """
         return [self.board_size,self.num_clusters,self.prob_nurse,self.prob_person]
 
     def get_diseases(self): 
+        """ 
+            Retrieves the list of diseases available to the current simulation. 
+            Returns: 
+                Disease[]:   List of available diseases
+        """
         return self.disease_choices
             
     def add_disease_option(self): 
+        """ 
+            Creates a new disease, and makes it available 
+            to the simulation.
+        """
         self.disease_choices.append(Disease())
 
     def start(self): 
+        """ 
+            Starts a simulation instance. 
+        """
         self.metrics.set_start_count(self.map.get_total_people())
         self.add_disease_option()
         # self.add_disease_option()
@@ -792,6 +806,14 @@ class Simulation:
         self.metrics.set_first_map(self.map.copy())
 
     def step(self): 
+        """ 
+            Steps through an iteration of the simulation. 
+            Squares are processed in a random order.
+            Processing involves different actions depending 
+            on which element is in the square. 
+            If conditions for termination are met, displays 
+            the final simulation statistics.  
+        """
         if self.map.check_end() is not False:
             print("Simulation Ended",self.map.check_end()) 
             return
@@ -841,7 +863,6 @@ class Simulation:
                     new_map.infect_surrounding(i,j)
                     # print("Moving infected at",i,j)
 
-
                     if self.map.is_nurse_adjacent(i,j):
                         # print("Nurse adjacent to",i,j)
                         continue
@@ -876,8 +897,6 @@ class Simulation:
                     continue
         self.map = new_map
         self.all_metrics.append(StepMetrics(self.metrics.copy(), new_map.copy()))
-    
-
 
     def view(self,chosen_map=None):
         """Visualize the grid using matplotlib."""
@@ -900,12 +919,25 @@ class Simulation:
         plt.show()
 
     def show_map(self): 
+        """
+            Gets the board of the current map in the simulation. 
+            Returns:
+                Map map:    The current map
+        """
         return self.map.get_map()
-    
 
-    import pandas as pd
-
+############# OSCAR CHECK COMMENT DESCRIBING WHAT THIS DOES ############
     def run_to_end(self, max_steps=100): 
+        """
+            Automatically runs the simulation either until it ends, 
+            or an assigned number of steps is reached, whichever is 
+            first.
+            Parameters:
+                int max_steps:              The maximum number of steps to execute
+            Returns: 
+                DataFrame infected_df:      Statistics on infected individuals. 
+                DataFrame overall_df:       Statistics on the whole simulation. 
+        """
         infected_statistics = []
         infected_stats = self.track_infected_statistics()
         overall_stats = self.track_overall_statistics()
@@ -944,11 +976,10 @@ class Simulation:
 
         return infected_df, overall_df
 
-
-
-
-
     def end(self): 
+        """
+            Display final statistics upon simulation termination. 
+        """       
         # total_matched, total_possible = self.metrics.get_hotspot_density()
         # print(total_matched,"starting neighbours out of",total_possible,"possible")
         # print("Started with",self.metrics.get_start_count(),"people. Ended with "+str(self.map.get_total_people()) 
@@ -978,20 +1009,27 @@ class Simulation:
         print("Finished at:")
         self.view()
 
-
+############# OSCAR WHAT ##############
     def raw_stats(self): 
        return []
+########################################
 
-#'''
-    #new changes
     def get_infected_count(self):
-        self.infected_count = 0
+        """
+            Determine how many people in total are 
+            infected in the current map. 
+            Returns:
+                int infected_count:     Number of infected individuals 
+                                            in the current map. 
+        """  
+        infected_count = 0
         for i in range(self.board_size):
             for j in range(self.board_size):
                 if self.map.get_element_at(i, j) == Tile.INFECTED:
-                        self.infected_count +=1
-        return self.infected_count
+                        infected_count +=1
+        return infected_count
 
+############# OSCAR PLEASE COMMENT BELOW ##############
 
     def track_infected_statistics(self):
         infected_stats = []
@@ -1015,16 +1053,6 @@ class Simulation:
                                 # Count the number of empty squares the infected person can visit
                                 if self.map.get_element_at(x, y) == Tile.EMPTY or self.map.get_element_at(x, y) == Tile.PERSON:
                                     squares_to_visit += 1
-                    
-
-
-                #    self.new_list = [i,j,
-                        #        uninfected_within_two_spaces,
-                      #          squares_to_visit,
-                       #         self.metrics.iterations]
-
-                    #if self.new_list not in self.old_list:
-                     #   self.old_list.append(self)
 
                     # Store the statistics for the infected person at (i, j)
                     infected_stats.append(
