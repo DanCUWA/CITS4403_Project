@@ -8,13 +8,13 @@ from queue import Queue
 import copy
 from enum import Enum
 import uuid
-# 
+
 class Condition(Enum): 
     NO_INFECTED = 0
     NO_NURSES = 1
     NO_PEOPLE = 2
     NO_INFECTED_OR_NURSES = 3
-# Numerical representation of board state.
+
 class Tile(Enum): 
     EMPTY = 0
     PERSON = 1
@@ -22,14 +22,30 @@ class Tile(Enum):
     INFECTED = 3
 # The Person class acts as the primary Agent for 
 # our scenario.
+"""
+Class representing people in the simulation.
+Each person has inherent attributes modelling 
+how they interact with the environment. 
+"""
 class Person: 
+    """
+    Constructor
+    Parameters: 
+        float prob_nurse: probability that 
+                    a new person is a nurse
+    """
     def __init__(self,prob_nurse): 
         self.nurse = False
+        # How long until this person (recovering from a disease)
+        #   can be reinfected
         self.immunity = 0
-        # Chance to resist disease
+        # Chance to resist being infected by a disease
         self.natural_resistance = random.uniform(0.0,0.2)
+        # Initial assigned health, retain a copy for metrics
         self.starting_health = random.randint(4,7)
+        # Current health, updated throughout simulation
         self.health = self.starting_health
+        # List of all diseases individual is currently infected with.
         self.diseases = list()
         if random.random() < prob_nurse: 
             self.nurse = True
@@ -53,16 +69,40 @@ class Person:
         return self.diseases
 
     def is_sick(self):
+        """
+        Checks if a given Person has any diseases.
+        Returns Boolean
+        """
         return len(self.diseases) > 0
     
     def appears_sick(self): 
+        """
+        Checks if other people can see this Person as sick.
+        Accounts for latent period, where others may not know 
+        the current Person is infected. 
+        """
         return self.is_sick() and not self.is_latent()
     
     def is_latent(self):
+        """
+        People will only appear as infected to other people 
+        when they reach a certain level of sickness. 
+        Returns:
+            True    If person is in latent period
+            False   Otherwise
+        """
         return self.health > 3
     # Adding a disease doesn't trigger its' effects immediately, but 
     #   will trigger at the start of each timestep.
     def add_disease(self,disease): 
+        """
+        Add a new diseases to the current person when they are infected 
+        by another person. Adding a disease doesn't trigger its' effects 
+        immediately, but will trigger at the start of each timestep.
+        Parameters: 
+            Diseases disease: An object of the Disease class that the 
+                                person has been infected with 
+        """
         if self.has_disease(disease.name): 
             print(self.diseases)
             return
@@ -70,17 +110,43 @@ class Person:
 
     
     def clear_diseases(self): 
+        """
+        Add a new diseases to the current person when they are infected 
+        by another person. Adding a disease doesn't trigger its' effects 
+        immediately, but will trigger at the start of each timestep.
+        Parameters: 
+            Diseases disease: An object of the Disease class that the 
+                                  person has been infected with.
+        """
         # print(self.diseases)
         self.diseases = list()
         # print(self.diseases)
 
     def has_disease(self,name): 
+        """
+        Checks if a person already has an instance of a disease. Used 
+        to ensure no one can get sick from multiple instances of the same 
+        disease simultaneously. 
+        Parameters: 
+            str name: The name of the disease to check.. 
+        Returns: 
+            Boolean:    True if person is already infected with the relevant 
+                            disease.
+                        False otherwise.
+        """
         for disease in self.diseases: 
             if name == disease.name: 
                 return True 
         return False
     
-    def update_health(self): 
+    def update_health(self):
+        """
+        Runs before an infected person moves in the simulation. 
+        Reduces their health according to the properties of the 
+        diseases they are infected with.  
+        Returns: 
+            int health:     The updated health value for the agent. 
+        """ 
         for disease in self.diseases: 
             if self.health == 1: 
                 if random.random() + self.natural_resistance < disease.kill_chance: 
@@ -91,23 +157,49 @@ class Person:
         return self.health
     
 # The Disease class acts as the secondary Agent for our scenario.
+"""
+The Disease class acts as the secondary Agent for our scenario.
+To accurately model real world scenarios, we account for multiple 
+types of diseases that vary in virulence and lethality. 
+"""
 class Disease:
+    """
+    Constructor for Disease Agents
+    """
     def __init__(self): 
-        # Chance to infect others
+        # Chance the diesease will spread to others
         self.infectivity = random.random()
-        # Chance for disease to decrease health
+        # Chance for disease to decrease an infected Persons' health
         self.mortality = random.uniform(0.5,1)
+        # Chance that a disease will actually kill a Person (reduce 
+        #   health below 0)
         self.kill_chance = random.uniform(0.2,0.4)
         # Unique identifier to prevent duplicates
         self.name = uuid.uuid4()
-
     def infect_random(self,map):
+        """
+            Runs before an infected person moves in the simulation. 
+            Reduces their health according to the properties of the 
+            diseases they are infected with.  
+            Parameters: 
+                Map map:    The map to infect a random Person in.    
+            Returns: 
+                int[] coords:     The coordinates [x,y] of the chosen 
+                                    Person. 
+        """ 
         # print(map.get_random_person())
         rand_coords = map.get_random_person()
         map.board[rand_coords[0]][rand_coords[1]].add_disease(copy.deepcopy(self))
         return rand_coords
 
     def will_spread(self): 
+        """
+            Determines if a disease will spread to a Person, 
+            based on the Diseases' infectivity.
+            Returns: 
+                Boolean:    True if the disease will spread,
+                            False otherwise 
+        """ 
         return random.random() < self.infectivity
 
     def __str__(self):
@@ -117,19 +209,41 @@ class Disease:
         return ret
 
 
-## The map acts as the environment for our scenario.
+"""
+The Map class acts as the environment for our simulation, 
+providing the board and other required features. 
+"""
 class Map:
+    """
+    Constructor for the Map class.
+    Parameters: 
+        int size:           The size of the board.
+        int k:              The number of clusters to  
+                                start with on the board.
+        float prob_nurse:   Probability that a new
+                                person is a nurse.
+        float prob_person:  Probability that an empty 
+                                square on the first map
+                                is a person.
+    """
     def __init__(self,size,k,prob_nurse,prob_person): 
         self.size = size
         self.prob_nurse = prob_nurse
         self.prob_person = prob_person
         self.num_clusters = k
+        # The 2d array that will hold the board state. 
         self.board = self.generate_array()
+        # Cluster initalisation 
+############# OSCAR ADD COMMENT DESCRIBING WHAT THIS DOES ############
         self.cluster_props = self.assign_cluster_probabilities()
         self.place_clusters()
 
     def generate_array(self): 
-        # Initialize the board with None (empty spaces)
+        """
+            Initialise an empty 2D array of the correct size. 
+            Returns: 
+                arr[][]:    2D array initialised to empty squares. 
+        """ 
         return [[None for _ in range(self.size)] for _ in range(self.size)]
 
     def assign_cluster_probabilities(self):
@@ -137,8 +251,18 @@ class Map:
         return [random.uniform(0.1, 0.5) for _ in range(self.num_clusters)]
 
     def is_nurse_adjacent(self,i,j): 
+        """
+            Checks if a given square is adjacent to a nurse,
+            and thus within healing range. 
+            Parameters:
+                int i:      The x coordinate of the square. 
+                int j:      The y coordinate of the square. 
+            Returns: 
+                Boolean:    True if the square is nurse adjacent,
+                            False otherwise. 
+        """ 
         neighbours = self.get_neighbours(i,j)
-        for neighbour,ni,nj in neighbours:
+        for neighbour,_,_ in neighbours:
             if neighbour is not None and neighbour.is_nurse(): 
                 return True 
         return False
@@ -187,44 +311,92 @@ class Map:
                     self.add_person(i, j)
 
     def add_person(self, i, j):
-        """Add a person to the grid."""
+        """
+            Add a new Person to the map, if the specified 
+            coordinates are valid.
+            Parameters:
+                int i:      The x coordinate to add the Person at. 
+                int j:      The y coordinate to add the Person at. 
+        """ 
         if self.board[i][j] is None:
             self.board[i][j] = Person(prob_nurse=self.prob_nurse)
 
     def get_random_person(self): 
+        """
+            Get a random person from the current choices in the map. 
+            Returns:
+                int[]:      The coordinates of the randomly chosen 
+                            person in form [i,j]
+        """ 
         return random.choice([[i,j] for i,row in enumerate(self.board) for j,col in enumerate(row) if self.get_element_at(i,j) == Tile.PERSON])
     
     def check_in_bounds(self,i,j): 
+        """
+            Error checking to ensure that given coordinates are 
+            a valid entry into the board. 
+            Parameters:
+                int i:      The x coordinate to add the Person at. 
+                int j:      The y coordinate to add the Person at. 
+            Returns: 
+                Boolean:    True if the parameters are a valid coordinate
+                                on the map. 
+                            False otherwise. 
+        """ 
         return i >= 0 and i < self.size and j >= 0 and j < self.size 
 
     def get_element_at(self,i,j): 
+        """
+            Returns a numerical value corresponding to the type of 
+            Agent present at the given location in the map. 
+            Parameters:
+                int i:      The x coordinate to add the Person to. 
+                int j:      The y coordinate to add the Person to. 
+            Returns: 
+                Condition:  The enum corresponding to the desired 
+                                square. 
+        """ 
         if self.board[i][j] is None: 
-            # return "Empty"
             return Tile.EMPTY
         if self.board[i][j].is_nurse():
-            # return "Nurse" 
             return Tile.NURSE
         elif self.board[i][j].is_sick(): 
             return Tile.INFECTED
         else: 
-            # return "Person"
             return Tile.PERSON
     
-    # Assumes caller is sick.
     def infect_surrounding(self,i,j): 
+        """
+            Tries to infect all People surrounding an infected individual 
+            at the given coordinates. 
+            Parameters:
+                int i:      The x coordinate of the infected indiividual. 
+                int j:      The y coordinate of the infected indiividual. 
+        """ 
         if not self.board[i][j].is_sick(): 
             return 
         cur_diseases = self.board[i][j].get_diseases()
-        num = 0
         for neighbour, ni, nj in self.get_neighbours(i,j):
             if neighbour is not None: 
                 print("Adding from",cur_diseases,self.board[i][j].get_diseases())
                 for disease in cur_diseases: 
+                    # Calculate if the Person will be infected,
+                    #   according to their resistances and the 
+                    #   diseases infectivity.
                     if disease.will_spread():
                         self.board[ni][nj].add_disease(disease)
                         print(disease, "added to", ni,nj)
         
     def get_neighbours(self,srci,srcj):
+        """
+            Returns all elements adjacent to the neighbour 
+            at the given coordinates.
+            Parameters:
+                int srci:           The x coordinate of the source square. 
+                int srcj:           The y coordinate of the source square. 
+            Returns: 
+                [[el,i,j]...]:   A 2D array containing [element,x_coord,y_coord]
+                                        for all neighbours of the source square.
+        """ 
         neighbours = list()
         for i in range(srci-1,srci+2):
             for j in range(srcj-1,srcj+2): 
@@ -235,6 +407,17 @@ class Map:
         return neighbours
 
     def make_random_move(self,i,j):
+        """
+            Moves an element to a randomly selected 
+            valid (empty) adjacent square.
+            Parameters:
+                int i:           The x coordinate of the element to move. 
+                int j:           The y coordinate of the element to move. 
+            Returns: 
+                None:            If no valid square is adjacent. 
+                int[2]:          Coordinates of square that was chosen 
+                                    to move to.
+        """ 
         options = [x for x in self.get_neighbours(i,j) if x[0] is None]
         # print("Choosing from",options)
         if len(options) == 0:
@@ -245,25 +428,38 @@ class Map:
         return [choice[1],choice[2]]
 
     def get_infected_surrounding(self,i,j):
+        """
+            Determine how many infected neighbours a Person can see 
+            adjacent to a chosen square. 
+            Parameters:
+                int i:           The x coordinate of the input square. 
+                int j:           The y coordinate of the input square. 
+            Returns: 
+                int count:       The number of infected neighbours seen. 
+        """ 
         count = 0
-        for neighbour, ni, nj in self.get_neighbours(i,j): 
+        for neighbour, _, _ in self.get_neighbours(i,j): 
             if neighbour is not None and neighbour.appears_sick():
                 count += 1
         return count
 
     def get_safest_surrounding(self,start_i,start_j):
+        """
+            Determine which adjacent square is the safest (has the least adjacent 
+            infected neighbours) for an uninfected Person to move to. 
+            Parameters:
+                int start_i:           The x coordinate of the input square. 
+                int start_j:           The y coordinate of the input square. 
+            Returns: 
+                int[2]:                The [i,j] coordinates of the safest square. 
+        """ 
         # Can only have a maximum of 9 neighbours.
         lowest = 10
         lowest_vals = None
-        # for i in range(start_i-1,start_i+2):
-        #     for j in range(start_j-1,start_j+2): 
-        #         if not self.check_in_bounds(i,j):
-        #             continue
-        for neighbour, ni, nj in self.get_neighbours(start_i,start_j):
+        for _, ni, nj in self.get_neighbours(start_i,start_j):
             # Only consider empty neighbours
             if self.get_element_at(ni,nj) == Tile.EMPTY:
                 unsafe_count = self.get_infected_surrounding(ni,nj) 
-                # print(unsafe_count,"sick around",ni,nj)
                 if unsafe_count < lowest: 
                     lowest = unsafe_count
                     lowest_vals = [ni,nj]
@@ -271,14 +467,38 @@ class Map:
         return lowest_vals
 
     def get_map(self):
+        """
+            Returns a copy of the current instance of the board. 
+            Returns: 
+                int[size][size]:    The current board. 
+        """ 
         return self.board
     
     def move_to(self,old_i,old_j,new_i,new_j): 
+        """
+            Moves an element to a new location. Integrity of new position should
+            be verified before call - board[new_i][new_j] should be empty. 
+            Parameters:
+                int old_i:           The x coordinate of the elements original position. 
+                int old_j:           The y coordinate of the elements original position. 
+                int new_i:           The x coordinate of the elements new position. 
+                int new_j:           The y coordinate of the elements new position. 
+        """ 
         element = self.board[old_i][old_j]
         self.clear_square(old_i,old_j)
         self.board[new_i][new_j] = element
 
     def get_most_infected_neighbour(self,i,j): 
+        """
+            Determine which square adjacent to the input square is the 
+            most at risk, and thus most important for the nurses to heal.
+            Parameters:
+                int i:                  The x coordinate of the desired square. 
+                int j:                  The y coordinate of the desired square. 
+            Returns: 
+                [neighbour,ni,nj]:      The details of the most at risk square -
+                                            the object and its' x, y coordinates.
+        """ 
         lowest_health = 10
         lowest_diseases = 0
         highest_priority = [None,None,None]
@@ -298,9 +518,22 @@ class Map:
         return highest_priority
 
     def clear_square(self,i,j):
+        """
+            Removes an element from the board.
+            Parameters:
+                int i:                  The x coordinate of the square to clear. 
+                int j:                  The y coordinate of the square to clear. 
+        """ 
         self.board[i][j] = None
 
     def map_to_ints(self): 
+        """
+            Returns a new board, with all elements converted to their 
+            respective numerical values. 
+            Returns:
+                int[size][size]:    The array containing numerically 
+                                        mapped values.
+        """ 
         grid = np.zeros((self.size, self.size))
         for i in range(self.size): 
             for j in range(self.size): 
@@ -310,6 +543,14 @@ class Map:
         return grid
     
     def get_closest_nurse(self,i,j): 
+        """
+            Calculates the coordinates of the closest nurse to the input square.
+            Parameters:
+                int i:                  The x coordinate of the square to evaluate. 
+                int j:                  The y coordinate of the square to evaluate. 
+            Returns:
+                int[2]:                 The [x,y] coordinates of the closest nurse.
+        """ 
         arr = np.array(self.map_to_ints())
         nurses = np.argwhere(arr == 2)
         # print(nurses)
@@ -326,16 +567,45 @@ class Map:
         return ret
     
     def get_num_neighbours(self,i,j): 
+        """
+            Calculates how many people are adjacent to a given square.
+            Parameters:
+                int i:                  The x coordinate of the square to evaluate. 
+                int j:                  The y coordinate of the square to evaluate. 
+            Returns:
+                int count:              The number of people adjacent to the square. 
+        """ 
         count = 0
-        for neighbour, ni, nj in self.get_neighbours(i,j):
+        for _, ni, nj in self.get_neighbours(i,j):
             if self.get_element_at(ni,nj) != Tile.EMPTY: 
                 count += 1
         return count
 
     def get_distance_bewteen(self,i,j,i2,j2): 
+        """
+            Calculates how many people are adjacent to a given square.
+            Parameters:
+                int i:                  The x coordinate of the source square. 
+                int j:                  The y coordinate of the source square. 
+                int i2:                 The x coordinate of the destination square. 
+                int j2:                 The y coordinate of the destination square. 
+            Returns:
+                float distance:         The distance between the two squares. 
+        """ 
         return np.sqrt((i - i2)**2 + (j - j2)**2)
 
     def get_best_move_from_to(self,srci,srcj,desti,destj): 
+        """
+            Greedily calculates the best move to make to get to a desired square
+            given the current map state.
+            Parameters:
+                int srci:                  The x coordinate of the source square. 
+                int srcj:                  The y coordinate of the source square. 
+                int desti:                 The x coordinate of the destination square. 
+                int destj:                 The y coordinate of the destination square. 
+            Returns:
+                int[2]:                    The coordinates of the best move to the detination.  
+        """ 
         min_dist = np.inf
         best_move = None
         for i in range(srci-1,srci+2):
@@ -353,9 +623,20 @@ class Map:
         return best_move
 
     def copy(self): 
+        """
+        Returns a deep copy of the current map to facilitate 
+        storing past state instances.
+        Returns:
+            Map map:    A deep copy of the current map.
+        """
         return copy.deepcopy(self)
 
     def get_total_people(self):
+        """
+        Gets the total number of people in current board. 
+        Returns:
+            int count:   The number of people in the board. 
+        """
         count = 0
         for i in range(self.size): 
             for j in range(self.size): 
@@ -366,6 +647,13 @@ class Map:
         return count   
     
     def check_end(self):
+        """
+        Determines if the current state of the map meets 
+        any of the simulation termination criteria.
+        Returns:
+            Condition termination:      The Condition causing the termination. 
+            Boolean False:              If no Condition is matched. 
+        """
         any_infected = False
         any_nurses = False
         any_people = False
@@ -388,23 +676,40 @@ class Map:
         #     return Condition.NO_NURSES
         return False
 
+"""
+The class responsible for incorporating the previous elements 
+and running a simulation instance.
+"""
 class Simulation: 
-
+    """
+    Constructor for the Simulation class.
+    Parameters: 
+        int board_size:           The size of the board. 
+                                  Default 100. 
+        int num_clusters:         The number of clusters to start with
+                                    on the board.
+                                  Default 4
+        float prob_nurse:         Probability that a new
+                                    person is a nurse.
+                                  Default 0.2 
+        float prob_person:        Probability that an empty square on 
+                                    the first map is a person.
+                                  Default 0.4
+    """
     def __init__(self,board_size=100,num_clusters=4,prob_nurse=0.2,prob_person=0.4): 
         self.board_size = board_size
         self.num_clusters = num_clusters
         self.prob_nurse = prob_nurse
         self.prob_person = prob_person
-        self.metrics = SimMetrics()
-        # self.initial_hotspots = list()
+        # Copy of the first map 
         self.starting_map = None
-        # self.start_count = 0
+        # The current map 
         self.map = Map(board_size,num_clusters,prob_nurse=prob_nurse,prob_person=prob_person)
+        # The list of possible diseases for the current simulation
         self.disease_choices = list()
-        # self.dead = list()
-        # self.iterations = 0
-        # self.previous = None
+        # Whether or not the simulation has terminated
         self.running = False
+        # Holds metrics for all individual steps. 
         self.all_metrics = list()
 
     def get_sim_params(self):
@@ -503,7 +808,7 @@ class Simulation:
                 else: 
                     grid[i][j] = chosen_map.get_element_at(i,j).value
         
-        bounds = [0, 1, 2, 3 ]
+        bounds = [0, 1, 2, 3]
         cmap = 'viridis'
         norm = plt.Normalize(vmin=bounds[0], vmax=bounds[-1])
 
