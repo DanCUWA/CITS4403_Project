@@ -701,6 +701,7 @@ class Simulation:
         self.num_clusters = num_clusters
         self.prob_nurse = prob_nurse
         self.prob_person = prob_person
+        self.metrics = SimMetrics()
         # Copy of the first map 
         self.starting_map = None
         # The current map 
