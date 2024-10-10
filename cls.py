@@ -724,7 +724,19 @@ class Map:
         # if not any_nurses: 
         #     return Condition.NO_NURSES
         return False
-
+                
+    def get_average_alive_stats(self): 
+        healths = []
+        res = []
+        for i in range(self.size): 
+            for j in range(self.size): 
+                if not self.check_in_bounds(i,j):
+                    continue
+                elif self.get_element_at(i,j) != Tile.EMPTY: 
+                    cur_person : Person = self.board[i][j]
+                    healths.append(cur_person.starting_health)
+                    res.append(cur_person.natural_resistance)
+        return np.mean(healths), np.mean(res)
 """
 The class responsible for incorporating the previous elements 
 and running a simulation instance.
@@ -924,7 +936,7 @@ class Simulation:
             Returns:
                 Map map:    The current map
         """
-        return self.map.get_map()
+        return self.map.get_map()        
 
 ############# OSCAR CHECK COMMENT DESCRIBING WHAT THIS DOES ############
     def run_to_end(self, max_steps=100): 
@@ -972,7 +984,8 @@ class Simulation:
         # Once the simulation is done or max steps reached, return the collected statistics
         infected_df = pd.DataFrame(infected_statistics, columns=["Infected X", "Infected Y","Uninfected Count Near", "Total Squares Visited", "Time Step", ])
 
-        overall_df = pd.DataFrame(overall_statistics, columns=["Time Step","Current Infected", "Total Deaths", "Total Healed" ])
+        overall_df = pd.DataFrame(overall_statistics, columns=["Time Step","Current Infected", "Total Deaths", "Total Healed","Average Alive Health",
+                                                                "Average Alive Resistance", "Average Dead Health","Average Dead Resistance"])
 
         return infected_df, overall_df
 
@@ -1077,22 +1090,29 @@ class Simulation:
             for j in range(self.board_size):
                 if self.map.get_element_at(i, j) == Tile.INFECTED:
                     total_infected += 1
-        
+        alive_stats = self.metrics.get_avg_alive_stats()
+        alive_health = alive_stats[0]
+        alive_res = alive_stats[1]
+        dead_stats = self.metrics.get_avg_dead_stats()
+        dead_health = dead_stats[0]
+        dead_res = dead_stats[1]
         # Store the overall statistics at the current time step
         overall_stats = [
             self.metrics.iterations,
             total_infected,
             total_deaths,
-            total_healed
+            total_healed,
+            alive_health,
+            alive_res,
+            dead_health,
+            dead_res
         ]
 
         return overall_stats
 
-    #ended here
-#'''
 class StepMetrics(): 
     def __init__(self,sim_metrics,map):
-        self.metrics = sim_metrics
+        self.metrics : SimMetrics = sim_metrics
         self.metrics.set_first_map(map)
 
 class SimMetrics:
@@ -1102,7 +1122,7 @@ class SimMetrics:
         self.iterations = 0
         self.start_count = 0
         self.initial_hotspots = list()
-        self.starting_map = None
+        self.starting_map : Map = None
 
     def add_dead(self,person): 
         self.dead.append(person)
@@ -1156,3 +1176,16 @@ class SimMetrics:
         for k in vars(self): 
             ret += k+":"+str(vars(self)[k])+" , "
         return ret
+
+
+    def get_avg_alive_stats(self): 
+        return self.starting_map.get_average_alive_stats()
+    
+    def get_avg_dead_stats(self):
+        healths = []
+        res = [] 
+        for d in self.metrics.get_dead():
+            cur_person : Person = d
+            healths.append(cur_person.starting_health)
+            res.append(cur_person.natural_resistance)
+        return np.mean(healths), np.mean(res)
