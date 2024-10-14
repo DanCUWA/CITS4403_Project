@@ -372,14 +372,14 @@ summary(anova_model_sim2)
 # Correlation Analysis
 ```{r}
 # Correlation analysis between average clustering coefficient and total deaths
-cor_test <- cor.test(overall_stats_with_clustering$avg_clustering_coef, overall_stats_with_clustering$Total.Deaths)
+cor_test <- cor.test(sim017_merged_data$avg_clustering_coef, sim017_merged_data$Total.Deaths)
 cor_test
 ```
 
 # Linear Regression Analysis
 ```{r}
 # Fit linear regression model
-lm_model <- lm(Total.Deaths ~ avg_clustering_coef, data = overall_stats_with_clustering)
+lm_model <- lm(Total.Deaths ~ avg_clustering_coef, data = sim017_merged_data)
 summary(lm_model)
 ```
 
@@ -391,7 +391,7 @@ summary(lm_model)
 #ANOVA Analysis
 ```{r}
 # Perform ANOVA to see if total deaths differ by time step
-anova_model <- aov(Total.Deaths ~ as.integer(timeStep), data = overall_stats_with_clustering)
+anova_model <- aov(Total.Deaths ~ as.integer(timeStep), data = sim017_merged_data)
 summary(anova_model)
 ```
 
