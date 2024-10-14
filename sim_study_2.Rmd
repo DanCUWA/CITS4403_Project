@@ -183,6 +183,18 @@ ggplot(overall_stats_with_clustering, aes(x = timeStep, y = Total.Deaths)) +
 ```
 
 
+```{r}
+# Plotting the relationship between Total Deaths and Average Clustering Coefficient
+ggplot(overall_stats_with_clustering, aes(x = timeStep, y = sqrt(Total.Deaths))) +
+  geom_point(color = "blue", size = 3) +    # Scatter plot points
+  geom_smooth(method = "lm", color = "red", se = TRUE) +  # Add linear regression line with confidence interval
+  labs(title = "Total Deaths vs. TimeStep",
+       x = "TimeStep",
+       y = "Total Deaths") +
+  theme_minimal()  # Apply a clean theme
+```
+
+
 
 ```{r}
 for(i in (as.integer(overall_stats_with_clustering$timeStep[-1]))){

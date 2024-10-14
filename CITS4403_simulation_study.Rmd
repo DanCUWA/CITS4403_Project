@@ -15,6 +15,7 @@ library(GGally)
 ```
 
 
+#Data Preparation
 
 ```{r}
 overall_stats <- read.csv("overall_stats.csv", header=T)
@@ -64,6 +65,9 @@ avg_clustering_coef_df <- infected_df %>%
 
 ```
 
+
+
+# Visualising Average Clustering Coefficient Over Time
 ```{r}
 # Plot average clustering coefficient over time steps
 ggplot(avg_clustering_coef_df, aes(x = as.numeric(as.character(timeStep)), y = avg_clustering_coef)) +
@@ -76,6 +80,8 @@ ggplot(avg_clustering_coef_df, aes(x = as.numeric(as.character(timeStep)), y = a
 
 ```
 
+
+# Merging Data for Analysis
 ```{r}
 colnames(overall_stats)[1] = "timeStep"
 colnames(overall_stats)
@@ -95,39 +101,11 @@ overall_stats_with_clustering
 ```
 
 ```{r}
-
-
-# Define UI for the app
-ui <- fluidPage(
-  titlePanel("Pairwise Plot of Variables"),
-  
-  sidebarLayout(
-    sidebarPanel(
-      h3("Pairwise Plot Settings"),
-      helpText("This plot shows relationships between all variables in the data."),
-      # Add any additional inputs you want to customize the plot
-    ),
-    
-    mainPanel(
-      plotOutput("pairwisePlot")
-    )
-  )
-)
-
-# Define server logic for pairwise plot
-server <- function(input, output) {
-  
-  # Generate pairwise plot using GGally::ggpairs
-  output$pairwisePlot <- renderPlot({
-    # Pairwise plot of all variables in the dataset
-    ggpairs(overall_stats_with_clustering, title = "Pairwise Plot of All Variables")
-  })
-}
-
-# Run the application 
-shinyApp(ui = ui, server = server)
+# Generate pairwise plot using GGally::ggpairs
+ggpairs(overall_stats_with_clustering, title = "Pairwise Plot of All Variables")
 
 ```
+
 
 ```{r}
 # Load ggplot2
@@ -145,6 +123,57 @@ ggplot(overall_stats_with_clustering, aes(x = avg_clustering_coef, y = Total.Dea
 ```
 
 
+# Correlation Analysis
+```{r}
+# Correlation analysis between average clustering coefficient and total deaths
+cor_test <- cor.test(overall_stats_with_clustering$avg_clustering_coef, overall_stats_with_clustering$Total.Deaths)
+cor_test
+```
 
+# Linear Regression Analysis
+```{r}
+# Fit linear regression model
+lm_model <- lm(Total.Deaths ~ avg_clustering_coef, data = overall_stats_with_clustering)
+summary(lm_model)
+```
+
+#ANOVA Analysis
+```{r}
+# Perform ANOVA to see if total deaths differ by time step
+anova_model <- aov(Total.Deaths ~ as.factor(timeStep), data = overall_stats_with_clustering)
+summary(anova_model)
+```
+
+# Results
+
+## Correlation Analysis
+A Pearson correlation analysis was conducted to examine the relationship between the average clustering coefficient and total deaths. The results indicated a strong negative correlation (r = -0.7947, p = 0.03272), suggesting that higher average clustering coefficients are associated with lower total deaths. The 95% confidence interval for the correlation coefficient was [-0.9683, -0.1037], which does not include zero, further supporting the significance of this finding.
+
+## Linear Regression Analysis
+A linear regression analysis was performed to predict total deaths from the average clustering coefficient. The regression equation is as follows:
+
+\[
+\text{Total.Deaths} = 0.6842 - 3.5728 \times \text{avg_clustering_coef}
+\]
+
+The average clustering coefficient was found to be a significant predictor of total deaths (β = -3.5728, p = 0.0327). The model explained approximately 63.16% of the variance in total deaths (R² = 0.6316).
+
+## ANOVA Analysis
+An ANOVA was conducted to evaluate differences in total deaths across different time steps. The results indicated significant differences in total deaths among the time steps (F(6,5) = 8.571, p < 0.05), suggesting that the timing of the epidemic influences mortality outcomes.
+
+These results underscore the importance of understanding clustering behavior in epidemic dynamics and its potential impact on public health outcomes.
+
+
+
+
+
+#Conclusion
+In this analysis, we investigated the relationship between the average clustering coefficient and total deaths, examining whether clustering behavior significantly impacts epidemic outcomes. We formulated hypotheses:
+
+H0: There is no significant relationship between the average clustering coefficient and total deaths.
+H1: There is a significant relationship between the average clustering coefficient and total deaths.
+By conducting correlation and regression analyses, we can assess whether the data supports or rejects the null hypothesis. Additionally, ANOVA will allow us to explore differences in total deaths across various time steps.
+
+Future work may address limitations such as the assumptions inherent in the simulation model and the potential impact of unconsidered variables.
 
 
