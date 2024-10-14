@@ -12,13 +12,20 @@ import heapq
 import pandas as pd
 
 
-
+"""
+    Enum representing simulation 
+    termination conditions. 
+"""
 class Condition(Enum): 
     NO_INFECTED = 0
     NO_NURSES = 1
     NO_PEOPLE = 2
     NO_INFECTED_OR_NURSES = 3
 
+"""
+    Enum numerically representing the value 
+    of a given element in the simulation. 
+"""
 class Tile(Enum): 
     EMPTY = 0
     PERSON = 1
@@ -238,7 +245,6 @@ class Map:
         # The 2d array that will hold the board state. 
         self.board = self.generate_array()
         # Cluster initalisation 
-############# OSCAR ADD COMMENT DESCRIBING WHAT THIS DOES ############
         self.cluster_props = self.assign_cluster_probabilities()
         self.place_clusters()
 
@@ -938,7 +944,6 @@ class Simulation:
         """
         return self.map.get_map()        
 
-############# OSCAR CHECK COMMENT DESCRIBING WHAT THIS DOES ############
     def run_to_end(self, max_steps=100): 
         """
             Automatically runs the simulation either until it ends, 
@@ -993,21 +998,6 @@ class Simulation:
         """
             Display final statistics upon simulation termination. 
         """       
-        # total_matched, total_possible = self.metrics.get_hotspot_density()
-        # print(total_matched,"starting neighbours out of",total_possible,"possible")
-        # print("Started with",self.metrics.get_start_count(),"people. Ended with "+str(self.map.get_total_people()) 
-        #       + ". " + str(self.metrics.get_start_count() - self.map.get_total_people()),"people died in",self.metrics.iterations,"iterations.")
-        # print("The following died:",self.metrics.get_dead())
-        # print(f"{self.metrics.get_healed()} healed.")
-        # print(f"Ended because of: {self.map.check_end()}")
-        # # print("Started at:")
-        # # self.view(chosen_map=self.metrics.get_first_map())
-        # # print("Finished at:")
-        # # self.view()
-        # for met in self.all_metrics: 
-        #     metric_cls : SimMetrics = met.metrics 
-        #     it = metric_cls.get_iterations()
-        #     print(it,str(metric_cls))
         description,total_matched, total_possible = self.metrics.get_hotspot_density()
         print(description,total_matched,"starting neighbours out of",total_possible,"possible")
         print("Started with",self.metrics.get_start_count(),"people. Ended with "+str(self.map.get_total_people()) 
@@ -1021,11 +1011,6 @@ class Simulation:
         self.view(chosen_map=self.metrics.get_first_map())
         print("Finished at:")
         self.view()
-
-############# OSCAR WHAT ##############
-    def raw_stats(self): 
-       return []
-########################################
 
     def get_infected_count(self):
         """
@@ -1042,9 +1027,13 @@ class Simulation:
                         infected_count +=1
         return infected_count
 
-############# OSCAR PLEASE COMMENT BELOW ##############
-
     def track_infected_statistics(self):
+        """
+            Evaluates current metrics for infected individuals. Gets 
+            infected statistics from the relevant step. 
+            Returns:
+                float[] infected_stats:     Current infected metrics
+        """  
         infected_stats = []
         for i in range(self.board_size):
             for j in range(self.board_size):
@@ -1081,6 +1070,12 @@ class Simulation:
         return infected_stats
 
     def track_overall_statistics(self):
+        """
+            Evaluates current metrics for the overall simulation. Gets simulation 
+            statistics from the relevant step. 
+            Returns:
+                float[] overall_stats:     Current simulation metrics
+        """  
         total_infected = 0
         total_deaths = len(self.metrics.get_dead())
         total_healed = self.metrics.get_healed()
@@ -1111,11 +1106,13 @@ class Simulation:
         return overall_stats
 
 class StepMetrics(): 
+    "Class holding metrics for a single step in the simulation."
     def __init__(self,sim_metrics,map):
         self.metrics : SimMetrics = sim_metrics
         self.metrics.set_first_map(map)
 
 class SimMetrics:
+    "Class holding overall metrics for the simulation."
     def __init__(self): 
         self.dead = list()
         self.num_healed = 0
@@ -1125,18 +1122,37 @@ class SimMetrics:
         self.starting_map : Map = None
 
     def add_dead(self,person): 
+        """
+            Adds a new person to the dead array. 
+            Parameters: 
+                Person person:      The person who died. 
+        """
         self.dead.append(person)
 
     def increment_healed(self):
+        """
+            Maintains the counter of the number of people healed. 
+        """
         self.num_healed += 1
 
     def increment_iterations(self): 
+        """
+            Maintains the counter of the number of steps in the simulation. 
+        """
         self.iterations += 1 
 
     def add_hotspot(self,hotspot): 
+        """
+            Maintains the list of starting locations for infected
+            individuals 
+        """
         self.initial_hotspots.append(hotspot)
     
     def get_hotspot_density(self):
+        """
+            Determines how many infected individuals are clustered
+            around each outbreak hotspot. 
+        """
         total_possible = 0
         total_matched = 0
         for hotspot in self.initial_hotspots: 
@@ -1148,40 +1164,94 @@ class SimMetrics:
         return ["hotspots",total_matched, total_possible]
 
     def set_first_map(self,map): 
+        """
+            Saves the first map for comparison against
+            the terminal state.    
+            Parameters:
+                Map map:        The initial state of the map.
+        """
         self.starting_map = map
 
     def get_first_map(self):
+        """
+            Gets the state of the initial map. 
+            Return:
+                Map map:        The initial state of the map.
+        """
         return self.starting_map
     
     def get_dead(self):
+        """
+            Gets the state of the decased individuals. 
+            Return:
+                Dead[] dead:        Array of dead people.
+        """
         return self.dead.copy()
     
     def get_healed(self): 
+        """
+            Gets the number of people healed throughout the simulation.
+            Return:
+                int num_healed:         The number of people healed. 
+        """
         return self.num_healed
     
     def set_start_count(self,num): 
+        """
+            Sets the number of people at the start of the simulation.
+        """
         self.start_count = num
 
     def get_iterations(self): 
+        """
+            Gets the number of steps in the simulation.
+            Return:
+                int iterations:         The number of steps. 
+        """
         return self.iterations
     
     def get_start_count(self): 
+        """
+            Gets the number of people at the start of the simulation.
+            Return:
+                int start_count:         The number of initial people. 
+        """
         return self.start_count
     
     def copy(self): 
+        """
+            Returns a copy of the simulation metrics.
+            Return:
+                SimMetrics metrics:         The current simulation metrics. 
+        """
         return copy.deepcopy(self)
     
     def __str__(self):
+        """
+            Prints the current simulation metrics in an intuitive format
+            using key iteration. 
+            Return:
+                str ret:        The formatted string to be printed.
+        """
         ret = ""
         for k in vars(self): 
             ret += k+":"+str(vars(self)[k])+" , "
         return ret
 
-
     def get_avg_alive_stats(self): 
+        """
+            Returns a copy of the metrics for alive individuals.
+            Return:
+                float[] metrics:         The current alive metrics. 
+        """
         return self.starting_map.get_average_alive_stats()
     
     def get_avg_dead_stats(self):
+        """
+            Returns a copy of the metrics for dead individuals.
+            Return:
+                float[] metrics:         The current dead metrics. 
+        """
         healths = []
         res = [] 
         for d in self.get_dead():
