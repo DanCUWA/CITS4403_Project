@@ -1184,7 +1184,7 @@ class SimMetrics:
     def get_avg_dead_stats(self):
         healths = []
         res = [] 
-        for d in self.metrics.get_dead():
+        for d in self.get_dead():
             cur_person : Person = d
             healths.append(cur_person.starting_health)
             res.append(cur_person.natural_resistance)

@@ -11,6 +11,7 @@ library(dplyr)
 library(ggplot2)
 library(shiny)
 library(GGally)
+library(caret)
 
 ```
 
@@ -18,25 +19,27 @@ library(GGally)
 #Data Preparation
 
 ```{r}
-overall_stats <- read.csv("overall_stats.csv", header=T)
-overall_stats <- na.omit(overall_stats)
-str(overall_stats)
-summary(overall_stats)
-head(overall_stats)
+data_prep <- function(file){
+  overall_stats <- read.csv(file, header=T)
+  overall_stats <- na.omit(overall_stats)
+  return(overall_stats)
+}
+
 ```
 
 ```{r}
-infected_person_stats <- read.csv("infected_person_stats.csv", header=T)
-str(infected_person_stats)
-summary(infected_person_stats)
-head(infected_person_stats)
-infected_person_stats
+data_prep2 <- function(file){
+  infected_person_stats <- read.csv(file, header=T)
+  infected_person_stats$clustering_coef <- infected_person_stats$Uninfected.Count.Near / infected_person_stats$Total.Squares.Visited
+  return(infected_person_stats)
+}
+
 ```
 
 ```{r}
-infected_person_stats$clustering_coef <- infected_person_stats$Uninfected.Count.Near / infected_person_stats$Total.Squares.Visited
-
-infected_df <- with(infected_person_stats,data.frame(timeStep = as.factor(Time.Step),
+infected_new <- function(dataframe){
+  infected_person_stats <- dataframe
+  infected_df <- with(infected_person_stats,data.frame(timeStep = as.integer(Time.Step),
                                                      xCoord = as.integer(Infected.X),
                                                      yCoord = as.integer(Infected.Y),
                                                      Uninfected.Count.Near,
@@ -44,83 +47,324 @@ infected_df <- with(infected_person_stats,data.frame(timeStep = as.factor(Time.S
                                                      clustering_coef
                                                      ))
 
-infected_df <-infected_df %>% mutate(across(-c(xCoord,yCoord,timeStep,clustering_coef), ~ as.integer(.)))
+  infected_df <-infected_df %>% mutate(across(-c(xCoord,yCoord,timeStep,clustering_coef), ~ as.integer(.)))
 
-head(infected_df)
-```
+  infected_df <- na.omit(infected_df)
 
-```{r}
-infected_df <- na.omit(infected_df)
-```
-
-```{r}
-summary(infected_df)
-```
-
-```{r}
-# Calculate the average clustering coefficient per time step
-avg_clustering_coef_df <- infected_df %>%
-  group_by(timeStep) %>%
-  summarize(avg_clustering_coef = mean(clustering_coef, na.rm = TRUE))
+  return(infected_df)
+}
 
 ```
-
-
 
 # Visualising Average Clustering Coefficient Over Time
 ```{r}
-# Plot average clustering coefficient over time steps
-ggplot(avg_clustering_coef_df, aes(x = as.numeric(as.character(timeStep)), y = avg_clustering_coef)) +
-  geom_line(color = "blue", size = 1.2) +
-  geom_point(color = "red", size = 2) +
-  labs(title = "Change in Average Clustering Coefficient Over Time",
-       x = "Time Step",
-       y = "Average Clustering Coefficient") +
-  theme_minimal()
-
+avg_cc_df <- function(data){
+  infected_df <- data
+  # Calculate the average clustering coefficient per time step
+avg_clustering_coef_df <- infected_df %>%
+  group_by(timeStep) %>%
+  summarize(avg_clustering_coef = mean(clustering_coef, na.rm = TRUE))
+  return(avg_clustering_coef_df)
+}
+plot_avg_cc <- function(data){
+  avg_clustering_coef_df <- data
+  p <- ggplot(avg_clustering_coef_df, aes(x = as.numeric(as.character(timeStep)), y = avg_clustering_coef)) +
+    geom_line(color = "blue", size = 1.2) +
+    geom_point(color = "red", size = 2) +
+    labs(title = "Change in Average Clustering Coefficient Over Time",
+         x = "Time Step",
+         y = "Average Clustering Coefficient") +
+    theme_minimal()
+  return(p)
+}
 ```
 
 
 # Merging Data for Analysis
 ```{r}
-colnames(overall_stats)[1] = "timeStep"
-colnames(overall_stats)
+merged_clust_data <- function(avg_cc, overall){
+  avg_clustering_coef_df <- avg_cc
+  overall_stats <- overall
+  colnames(overall_stats)[1] <- "timeStep"
+  avg_clustering_coef_df$timeStep <- as.integer(avg_clustering_coef_df$timeStep)
+  overall_stats$timeStep <- as.integer(overall_stats$timeStep)  
+  overall_stats_with_clustering <- merge(overall_stats, avg_clustering_coef_df, by = "timeStep", all.x = TRUE)
 
-
-# Convert the timeStep columns to the same type in both dataframes if necessary
-avg_clustering_coef_df$timeStep <- as.factor(avg_clustering_coef_df$timeStep)
-# Merge overall_stats with avg_clustering_coef_df
-overall_stats_with_clustering <- merge(overall_stats, avg_clustering_coef_df, by = "timeStep", all.x = TRUE)
-
-# Check structure, summary, and first few rows of the updated dataframe
-str(overall_stats_with_clustering)
-summary(overall_stats_with_clustering)
-head(overall_stats_with_clustering)
-overall_stats_with_clustering[7,5] = 0
-overall_stats_with_clustering
-```
-
-```{r}
-# Generate pairwise plot using GGally::ggpairs
-ggpairs(overall_stats_with_clustering, title = "Pairwise Plot of All Variables")
+  return(overall_stats_with_clustering)
+}
 
 ```
 
 
+
+
 ```{r}
-# Load ggplot2
+# Load necessary libraries
+library(dplyr)
 library(ggplot2)
 
-# Create the plot
-ggplot(overall_stats_with_clustering, aes(x = avg_clustering_coef, y = Total.Deaths)) +
-  geom_point(color = "blue", size = 3) +    # Scatter plot points
-  geom_smooth(method = "lm", color = "red", se = TRUE) +  # Add linear regression line with confidence interval
-  labs(title = "Total Deaths vs. Average Clustering Coefficient",
-       x = "Average Clustering Coefficient",
-       y = "Total Deaths") +
-  theme_minimal()  # Apply a clean theme
+# Define the function to read, process the data, and generate the plots
+process_simulation_data <- function(PROB_NURSE, PROB_PERSON, sim_num) {
+  
+  # Create the filenames based on the probability values and sim_num
+  name <- paste0(strsplit(as.character(PROB_NURSE), "\\.")[[1]][2], "_", 
+                 strsplit(as.character(PROB_PERSON), "\\.")[[1]][2], "_", 
+                 as.character(sim_num))
+  
+  inf_name <- paste0("inf_", name, ".csv")
+  over_name <- paste0("over_", name, ".csv")
+  
+  # Read the datasets
+  infected_person_stats <- read.csv(inf_name, header = TRUE)
+  overall_stats <- read.csv(over_name, header = TRUE)
+  
+  # Data Cleaning and Processing
+  infected_person_stats$clustering_coef <- infected_person_stats$Uninfected.Count.Near / infected_person_stats$Total.Squares.Visited
+  
+  infected_df <- with(infected_person_stats, data.frame(
+    timeStep = as.factor(Time.Step),
+    xCoord = as.integer(Infected.X),
+    yCoord = as.integer(Infected.Y),
+    Uninfected.Count.Near,
+    Total.Squares.Visited,
+    clustering_coef
+  ))
+  
+  infected_df <- infected_df %>% mutate(across(-c(xCoord, yCoord, timeStep, clustering_coef), ~ as.integer(.)))
+  infected_df <- na.omit(infected_df)
+  
+  # Calculate the average clustering coefficient per time step
+  avg_clustering_coef_df <- infected_df %>%
+    group_by(timeStep) %>%
+    summarize(avg_clustering_coef = mean(clustering_coef, na.rm = TRUE))
+  
+  # Merge overall_stats with avg_clustering_coef_df
+  colnames(overall_stats)[1] <- "timeStep"
+  overall_stats$timeStep <- as.factor(overall_stats$timeStep)
+  overall_stats_with_clustering <- merge(overall_stats, avg_clustering_coef_df, by = "timeStep", all.x = TRUE)
+  
+  # Fill NA values for avg_clustering_coef
+  overall_stats_with_clustering <- overall_stats_with_clustering %>%
+    mutate(avg_clustering_coef = ifelse(is.na(avg_clustering_coef), 0, avg_clustering_coef))
+  
+  # Calculate new healed, infected, and deaths
+  overall_stats_with_clustering$new_healed <- c(0, diff(overall_stats_with_clustering$Total.Healed))
+  overall_stats_with_clustering$new_infected <- c(overall_stats_with_clustering$Current.Infected[1], 
+                                                  diff(overall_stats_with_clustering$Current.Infected) + 
+                                                  diff(overall_stats_with_clustering$Total.Healed) + 
+                                                  diff(overall_stats_with_clustering$Total.Deaths))
+  overall_stats_with_clustering$new_deaths <- c(0, diff(overall_stats_with_clustering$Total.Deaths))
+  
+
+  
+  # Plot: New Infected, New Deaths, and New Healed vs Time Step
+  print(
+    ggplot(overall_stats_with_clustering, aes(x = as.numeric(as.character(timeStep)))) +
+      # Column graph for new deaths
+      geom_bar(aes(y = new_deaths), stat = "identity", fill = "orange", alpha = 0.5) +
+      # Column graph for new healed
+      geom_bar(aes(y = new_healed), stat = "identity", fill = "green", alpha = 0.5) +
+      # Line plot for new infected
+      geom_line(aes(y = new_infected), color = "blue", size = 1.5) +
+      geom_point(aes(y = new_infected), color = "red", size = 2) +
+      labs(title = "New Infected, New Deaths, and New Healed vs Time Step",
+           x = "Time Step", y = "Count") +
+      theme_minimal()
+  )
+  
+  # Return the processed data
+  return(overall_stats_with_clustering)
+}
 
 ```
+
+
+#function to run similation on two any two given input datasets
+```{r}
+simulation_results <- function(overall_file,infected_file){
+  overall_stats <- data_prep(overall_file)
+  str(overall_stats)
+  infected_person_stats <- data_prep2(infected_file)
+  
+  str(infected_person_stats)
+  infected_df <- infected_new(infected_person_stats)
+  
+  head(infected_df)
+  summary(infected_df)
+  return(list(overall_stats,infected_person_stats,infected_df))
+}
+
+
+```
+
+```{r}
+simulation_results_merged_data <- function(infected_df, overall_stats){
+  
+  plot_avg_cc(avg_cc_df(infected_df))
+  overall_stats_with_clustering <- merged_clust_data(avg_cc_df(infected_df),overall_stats)
+  
+  str(overall_stats_with_clustering)
+  summary(overall_stats_with_clustering)
+  head(overall_stats_with_clustering)
+  
+  return(overall_stats_with_clustering)
+}
+
+```
+
+```{r}
+simulation_results_plots <- function(overall_stats_with_clustering){
+  p1 <- ggpairs(overall_stats_with_clustering, title = "Pairwise Plot of All Variables")
+  p2 <- ggplot(overall_stats_with_clustering, aes(x = avg_clustering_coef, y = Total.Deaths)) +
+    geom_point(color = "blue", size = 3) +    # Scatter plot points
+    geom_smooth(method = "lm", color = "red", se = TRUE) +  # Add linear regression line with confidence interval
+    labs(title = "Total Deaths vs. Average Clustering Coefficient",
+         x = "Average Clustering Coefficient",
+         y = "Total Deaths") +
+    theme_minimal()  # Apply a clean theme
+  return(list(p1,p2))
+  
+}
+
+
+```
+
+
+#simulation 1:
+```{r}
+sim1 <- simulation_results("overall_stats.csv","infected_person_stats.csv")
+sim1_merged_data <- simulation_results_merged_data(sim1[3][[1]],sim1[1][[1]])
+sim1_merged_data
+sim1_plots <- simulation_results_plots(sim1_merged_data)
+sim1_plots
+infected_new(infected_person_stats)
+```
+
+#simulation 2:
+```{r}
+# Example usage of the function
+PROB_NURSE <- 0.05
+PROB_PERSON <- 0.2
+sim_num <- 3
+processed_data <- process_simulation_data(PROB_NURSE, PROB_PERSON, sim_num)
+#processed_data <- processed_data[-c(length(processed_data$timeStep)),]
+processed_data <- na.omit(processed_data)
+# Print the processed data
+print(processed_data)
+```
+
+
+```{r}
+sim2 <- simulation_results("over_05_2_3.csv","inf_05_2_3.csv")
+sim2_merged_data <- simulation_results_merged_data(sim2[3][[1]],sim2[1][[1]])
+str(sim2_merged_data)
+list(processed_data,sim2_merged_data)
+sim2_merged_data$new_healed <-  processed_data$new_healed
+sim2_merged_data$new_infected <-  processed_data$new_infected
+sim2_merged_data$new_deaths <-  processed_data$new_deaths
+sim2_merged_data
+
+sim2_plots <- simulation_results_plots(sim2_merged_data)
+sim2_plots
+```
+
+
+
+
+
+
+
+##Simulation 1: Correlation Analysis
+```{r}
+cor_test_sim017 <- cor.test(sim017_merged_data$avg_clustering_coef, sim017_merged_data$Total.Deaths)
+cor_test_sim017
+```
+##Simulation 2: Correlation Analysis
+```{r}
+cor_test_sim2 <- cor.test(sim2_merged_data$avg_clustering_coef, sim2_merged_data$Total.Deaths)
+cor_test_sim2
+```
+##Simulation 1: Linear Regression Analysis
+```{r}
+lm_model_sim017 <- lm(Total.Deaths ~ avg_clustering_coef, data = sim017_merged_data)
+summary(lm_model_sim017)
+```
+##Simulation 2: Linear Regression Analysis
+```{r}
+sim2_merged_data <- na.omit(sim2_merged_data)
+sim2_merged_data
+lm_model_sim2 <- lm(Total.Deaths ~ ., data = sim2_merged_data)
+summary(lm_model_sim2)
+```
+
+```{r}
+# Load necessary library
+library(dplyr)
+
+# Step 1: Remove rows with NAs in the dataset
+sim2_cleaned <- sim2_merged_data %>%
+  filter(!is.na(Average.Alive.Resistance))
+
+# Step 2: Create a Null Model (only intercept)
+null_model <- lm(Total.Deaths ~ 1, data = sim2_cleaned)
+summary(null_model)
+
+# Step 3: Full Model with all predictors
+full_model <- lm(Total.Deaths ~ ., data = sim2_cleaned)
+full_model_summary <- summary(full_model)
+
+# Step 4: Store the results
+model_results <- list(null_model = null_model)
+
+# Extract p-values for all predictors and sort
+p_values <- full_model_summary$coefficients[, 4][-1]  # Exclude intercept
+sorted_predictors <- names(sort(p_values, decreasing = FALSE))  # Sort by p-values
+
+# Step 5: Incrementally add significant predictors
+significant_model <- null_model
+
+for (predictor in sorted_predictors) {
+  # Create the formula for the new model
+  current_predictors <- all.vars(formula(significant_model))
+  
+  # Create formula that includes the intercept and the new predictor
+  new_formula <- as.formula(paste("Total.Deaths ~", paste(c(current_predictors, predictor), collapse = " + ")))
+  
+  # Fit the new model
+  new_model <- lm(new_formula, data = sim2_cleaned)
+  
+  # Check p-value for the added predictor
+  new_model_summary <- summary(new_model)
+  added_p_value <- new_model_summary$coefficients[predictor, 4]
+  
+  # Only add predictor if it is significant
+  if (added_p_value < 0.05) {
+    significant_model <- new_model
+    model_results[[predictor]] <- new_model
+  }
+}
+
+# Show the summary of the final model
+summary(significant_model)
+
+```
+
+
+##Simulation 1: ANOVA Analysis
+```{r}
+anova_model_sim017 <- aov(Total.Deaths ~ as.integer(timeStep), data = sim017_merged_data)
+summary(anova_model_sim1)
+```
+##Simulation 2: ANOVA Analysis
+```{r}
+anova_model_sim2 <- aov(Total.Deaths ~ as.integer(timeStep), data = sim2_merged_data)
+summary(anova_model_sim2)
+```
+
+
+
+
+
 
 
 # Correlation Analysis
@@ -137,10 +381,15 @@ lm_model <- lm(Total.Deaths ~ avg_clustering_coef, data = overall_stats_with_clu
 summary(lm_model)
 ```
 
+
+
+
+
+
 #ANOVA Analysis
 ```{r}
 # Perform ANOVA to see if total deaths differ by time step
-anova_model <- aov(Total.Deaths ~ as.factor(timeStep), data = overall_stats_with_clustering)
+anova_model <- aov(Total.Deaths ~ as.integer(timeStep), data = overall_stats_with_clustering)
 summary(anova_model)
 ```
 
@@ -175,5 +424,104 @@ H1: There is a significant relationship between the average clustering coefficie
 By conducting correlation and regression analyses, we can assess whether the data supports or rejects the null hypothesis. Additionally, ANOVA will allow us to explore differences in total deaths across various time steps.
 
 Future work may address limitations such as the assumptions inherent in the simulation model and the potential impact of unconsidered variables.
+
+
+
+# model prediction
+```{r}
+sim0 <- simulation_results("over_05_2_0.csv","inf_05_2_0.csv")
+sim0_merged_data <- simulation_results_merged_data(sim0[3][[1]],sim0[1][[1]])
+sim0_merged_data
+sim0_plots <- simulation_results_plots(sim0_merged_data)
+sim0_plots
+```
+
+```{r}
+sim017 <- simulation_results("over_01_7_0.csv","inf_01_7_0.csv")
+sim017_merged_data <- simulation_results_merged_data(sim017[3][[1]],sim017[1][[1]])
+sim017_merged_data
+sim017_plots <- simulation_results_plots(sim017_merged_data)
+sim017_plots
+```
+
+
+
+# Runing a predictive model between different initialisarions for simulation
+
+```{r}
+
+
+# Assume total population is included in the datasets, or calculate it if not available
+
+# Step 1: Fit a model using sim1_merged_data, standardizing Total.Deaths
+train_data <- sim0_merged_data  # Your training dataset
+train_data <- train_data %>%
+  filter(!is.na(Total.Deaths)) %>%
+  mutate(Deaths_Rate = Total.Deaths / (Current.Infected + Total.Healed + Total.Deaths))  # Standardize deaths
+
+# Fit a model with significant predictors only (modify as needed)
+model_train <- lm(Deaths_Rate ~ Current.Infected + 
+                  Total.Healed + Average.Dead.Resistance, data = train_data)
+summary(model_train)
+# Step 2: Predict standardized total deaths using sim2_merged_data
+test_data <- sim2_merged_data  # Your testing dataset
+test_data <- test_data %>%
+  filter(!is.na(Total.Deaths)) %>%
+  mutate(Deaths_Rate = Total.Deaths / (Current.Infected + Total.Healed + Total.Deaths))  # Standardize deaths
+test_data
+# Use the model to predict
+test_data$Predicted_Deaths_Rate <- predict(model_train, newdata = test_data)
+
+# Convert predicted rates back to total deaths
+test_data$Predicted.Deaths <- test_data$Predicted_Deaths_Rate * (test_data$Current.Infected + test_data$Total.Healed + test_data$Total.Deaths)
+
+# Step 3: Create a confusion matrix
+# Convert continuous predictions to binary outcomes
+# Here, let's assume we classify as high deaths if predicted deaths > median of the training set
+threshold <- median(train_data$Deaths_Rate)
+threshold
+
+# Create binary outcomes for confusion matrix
+test_data$Actual.Outcome <- ifelse(test_data$Deaths_Rate > threshold, "High", "Low")
+test_data$Predicted.Outcome <- ifelse(test_data$Predicted.Deaths > threshold, "High", "Low")
+test_data
+summary(test_data)
+# Create confusion matrix
+confusion_mat <- confusionMatrix(factor(test_data$Predicted.Outcome), 
+                                 factor(test_data$Actual.Outcome))
+
+# Print the confusion matrix results
+print(confusion_mat)
+
+# Step 4: Plot predictions against actual values (optional)
+ggplot(test_data, aes(x = Total.Deaths, y = Predicted.Deaths)) +
+  geom_point(color = "blue") +
+  geom_abline(slope = 1, intercept = 0, linetype = "dashed", color = "red") +
+  labs(title = "Actual vs. Predicted Total Deaths (Standardized)",
+       x = "Actual Total Deaths",
+       y = "Predicted Total Deaths") +
+  theme_minimal()
+train_data
+```
+
+
+
+
+```{r}
+# Example input for process_simulation_data function
+
+PROB_NURSE <- 0.05  # Probability of infection from a nurse
+PROB_PERSON <- 0.2  # Probability of infection from a person
+sim_num <- 3        # Simulation number corresponding to the file
+
+# Call the function to process the data
+processed_data <- process_simulation_data(PROB_NURSE, PROB_PERSON, sim_num)
+
+# Print the processed data to check new_healed, new_infected, and new_deaths
+processed_data <- na.omit(processed_data)
+print(processed_data)
+
+```
+
 
 
