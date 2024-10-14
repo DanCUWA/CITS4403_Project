@@ -237,7 +237,6 @@ sim1_merged_data <- simulation_results_merged_data(sim1[3][[1]],sim1[1][[1]])
 sim1_merged_data
 sim1_plots <- simulation_results_plots(sim1_merged_data)
 sim1_plots
-infected_new(infected_person_stats)
 ```
 
 #simulation 2:
@@ -254,7 +253,7 @@ print(processed_data)
 ```
 
 
-```{r}
+```{r, fig.height = 7}
 sim2 <- simulation_results("over_05_2_3.csv","inf_05_2_3.csv")
 sim2_merged_data <- simulation_results_merged_data(sim2[3][[1]],sim2[1][[1]])
 str(sim2_merged_data)
@@ -270,11 +269,14 @@ sim2_plots
 
 
 
-
-
-
-
-##Simulation 1: Correlation Analysis
+##Simulation 017: Correlation Analysis
+```{r}
+sim017 <- simulation_results("over_01_7_0.csv","inf_01_7_0.csv")
+sim017_merged_data <- simulation_results_merged_data(sim017[3][[1]],sim017[1][[1]])
+sim017_merged_data
+sim017_plots <- simulation_results_plots(sim017_merged_data)
+sim017_plots
+```
 ```{r}
 cor_test_sim017 <- cor.test(sim017_merged_data$avg_clustering_coef, sim017_merged_data$Total.Deaths)
 cor_test_sim017
@@ -353,7 +355,7 @@ summary(significant_model)
 ##Simulation 1: ANOVA Analysis
 ```{r}
 anova_model_sim017 <- aov(Total.Deaths ~ as.integer(timeStep), data = sim017_merged_data)
-summary(anova_model_sim1)
+summary(anova_model_sim017)
 ```
 ##Simulation 2: ANOVA Analysis
 ```{r}
@@ -436,13 +438,7 @@ sim0_plots <- simulation_results_plots(sim0_merged_data)
 sim0_plots
 ```
 
-```{r}
-sim017 <- simulation_results("over_01_7_0.csv","inf_01_7_0.csv")
-sim017_merged_data <- simulation_results_merged_data(sim017[3][[1]],sim017[1][[1]])
-sim017_merged_data
-sim017_plots <- simulation_results_plots(sim017_merged_data)
-sim017_plots
-```
+
 
 
 
